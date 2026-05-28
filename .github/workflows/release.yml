@@ -1,8 +1,8 @@
-name: Release
+name: Release Pro
 
 on:
   push:
-    tags: ['v*.*.*']
+    tags: ['pro-v*.*.*']
   workflow_dispatch: {}
 
 jobs:

@@ -1,8 +1,8 @@
 {
-  "name": "meeting-slot-picker",
+  "name": "meeting-slot-picker-pro",
   "private": true,
   "version": "0.1.0",
-  "description": "日程調整スロットピッカー — Google カレンダー連携のメニューバー常駐アプリ (Tauri)",
+  "description": "日程ピッカー Pro — Google + Outlook 対応の日程調整スロットピッカー",
   "type": "module",
   "scripts": {
     "dev": "vite",

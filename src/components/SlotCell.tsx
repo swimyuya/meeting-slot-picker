@@ -103,12 +103,13 @@ function isTouchLike(pointerType: string): boolean {
 }
 
 function formatEventLine(ev: CalendarEvent): string {
-  if (ev.allDay) return `終日 ${ev.summary}`;
+  const prefix = ev.source === "microsoft" ? "Outlook: " : "";
+  if (ev.allDay) return `終日 ${prefix}${ev.summary}`;
   const startD = new Date(ev.start);
   const endD = new Date(ev.end);
   const sP = toJstParts(startD);
   const eP = toJstParts(endD);
   const sameDay = sP.year === eP.year && sP.month === eP.month && sP.day === eP.day;
-  if (sameDay) return `${toHHMM(startD)}-${toHHMM(endD)} ${ev.summary}`;
-  return `${sP.month}/${sP.day} ${toHHMM(startD)} - ${eP.month}/${eP.day} ${toHHMM(endD)} ${ev.summary}`;
+  if (sameDay) return `${toHHMM(startD)}-${toHHMM(endD)} ${prefix}${ev.summary}`;
+  return `${sP.month}/${sP.day} ${toHHMM(startD)} - ${eP.month}/${eP.day} ${toHHMM(endD)} ${prefix}${ev.summary}`;
 }

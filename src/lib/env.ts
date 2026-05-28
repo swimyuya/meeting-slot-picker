@@ -18,7 +18,18 @@ export const GOOGLE_CLIENT_ID: string =
 export const GOOGLE_CLIENT_SECRET: string | undefined =
   (import.meta.env.VITE_GOOGLE_CLIENT_SECRET as string | undefined) || undefined;
 
-export const isClientIdConfigured = (): boolean => GOOGLE_CLIENT_ID.length > 0;
+export const MICROSOFT_CLIENT_ID: string =
+  (import.meta.env.VITE_MICROSOFT_CLIENT_ID as string | undefined) ?? "";
+
+/** Tauri 経路で Azure app の client secret が必要な場合。Web/Extension では undefined。 */
+export const MICROSOFT_CLIENT_SECRET: string | undefined =
+  (import.meta.env.VITE_MICROSOFT_CLIENT_SECRET as string | undefined) || undefined;
+
+export const isGoogleConfigured = (): boolean => GOOGLE_CLIENT_ID.length > 0;
+export const isMicrosoftConfigured = (): boolean => MICROSOFT_CLIENT_ID.length > 0;
+
+/** 後方互換: 旧 isClientIdConfigured は Google 設定の有無を返す。 */
+export const isClientIdConfigured = (): boolean => isGoogleConfigured();
 
 /** Web ビルド用 API ベース URL。空文字 = 同一オリジン (Vercel 内 /api/* を呼ぶ既定)。 */
 const API_BASE_URL: string =

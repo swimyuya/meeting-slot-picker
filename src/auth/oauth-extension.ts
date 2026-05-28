@@ -1,20 +1,26 @@
 /**
- * Google OAuth — Chrome 拡張機能 (Manifest V3) フロー。
+ * Chrome 拡張機能 (Manifest V3) 用 OAuth フロー — provider 共通。
  *
- * 1. PKCE verifier/challenge と state を生成
- * 2. redirect_uri = chrome.identity.getRedirectURL()
- *    → 形式: https://<extension-id>.chromiumapp.org/
- *    → GCP の承認済みリダイレクト URI にこの URL を登録する必要あり
- * 3. chrome.identity.launchWebAuthFlow で同意画面を開く
- *    Chrome がリダイレクトを自動インターセプトしてレスポンス URL を返す
- *    → /auth/callback ページは不要 (PWA との違い)
- * 4. URL から code を取り出し、/api/auth/exchange に POST
- * 5. refresh_token を chrome.storage.local に保存
+ * フロー:
+ *   1. PKCE verifier/challenge と state を生成 (provider 仕様を反映)
+ *   2. redirect_uri = chrome.identity.getRedirectURL()  ← https://<ext-id>.chromiumapp.org/
+ *   3. chrome.identity.launchWebAuthFlow で同意画面を開く
+ *      Chrome がリダイレクトを自動インターセプトしてレスポンス URL を返す
+ *   4. URL から code を取り出し、/api/auth/exchange に provider 付きで POST
+ *   5. refresh_token を chrome.storage.local に provider 別キーで保存
+ *      + id_token から email 抽出して identity 保存
  */
 
 import { getApiBaseUrl } from "../lib/env";
-import { setRefreshToken } from "../lib/secrets";
-import { buildAuthUrl, DEFAULT_SCOPE, generatePkce } from "./oauth";
+import {
+  setFirstConnectedAtIfMissing,
+  setProviderForIdentity,
+  setRefreshToken,
+  setUserEmail,
+} from "../lib/secrets";
+import { emailFromIdToken } from "./identity";
+import { buildAuthUrl, generatePkce, generateState } from "./oauth";
+import { getProviderSpec, type ProviderId } from "./providers";
 
 interface ChromeIdentityLike {
   identity: {
@@ -42,25 +48,28 @@ export interface ExtensionSignInDeps {
 
 /**
  * Chrome 拡張機能で OAuth フローを実行し、refresh_token を chrome.storage に保存する。
- * 同意画面はポップアップで開き、user が許可すると Chrome が自動でフローを完了させる。
  */
 export async function signInExtension(
+  provider: ProviderId,
   config: ExtensionSignInConfig,
   deps: ExtensionSignInDeps = {},
 ): Promise<void> {
   if (!config.clientId) {
-    throw new Error("VITE_GOOGLE_CLIENT_ID が未設定です。");
+    throw new Error(
+      `${getProviderSpec(provider).displayName}: client_id が未設定です。`,
+    );
   }
   const fetchFn = deps.fetchFn ?? fetch;
   const identity = getChromeIdentity();
   const redirectUri = identity.identity.getRedirectURL();
+  const spec = getProviderSpec(provider);
 
   const { verifier, challenge } = await generatePkce();
   const state = generateState();
-  const authUrl = buildAuthUrl({
+  const authUrl = buildAuthUrl(spec, {
     clientId: config.clientId,
     redirectUri,
-    scope: config.scope ?? DEFAULT_SCOPE,
+    scope: config.scope ?? spec.defaultScope,
     challenge,
     state,
   });
@@ -80,7 +89,7 @@ export async function signInExtension(
   const errorParam = url.searchParams.get("error");
 
   if (errorParam) {
-    throw new Error(`Google 認可エラー: ${errorParam}`);
+    throw new Error(`認可エラー: ${errorParam}`);
   }
   if (!code) {
     throw new Error("認可コードがレスポンスに含まれません。");
@@ -89,11 +98,12 @@ export async function signInExtension(
     throw new Error("state が一致しません (CSRF の可能性があります)。");
   }
 
-  const apiUrl = `${getApiBaseUrl() || "https://meeting-slot-picker.vercel.app"}/api/auth/exchange`;
+  const apiUrl = `${getApiBaseUrl() || "https://meeting-slot-picker-pro.vercel.app"}/api/auth/exchange`;
   const res = await fetchFn(apiUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
+      provider,
       code,
       code_verifier: verifier,
       redirect_uri: redirectUri,
@@ -105,17 +115,21 @@ export async function signInExtension(
       `/api/auth/exchange 失敗: ${res.status} ${body.message ?? body.error ?? ""}`,
     );
   }
-  const json = (await res.json()) as { refresh_token?: string };
+  const json = (await res.json()) as { refresh_token?: string; id_token?: string };
   if (!json.refresh_token) {
     throw new Error("refresh_token がレスポンスに含まれません。");
   }
-  await setRefreshToken(json.refresh_token);
-}
+  await setRefreshToken(provider, json.refresh_token);
 
-function generateState(): string {
-  const random = new Uint8Array(16);
-  crypto.getRandomValues(random);
-  let binary = "";
-  for (const b of random) binary += String.fromCharCode(b);
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  // identity (email) を保存 — 失敗は無視
+  try {
+    const email = emailFromIdToken(json.id_token);
+    if (email) {
+      await setUserEmail(email);
+      await setProviderForIdentity(provider);
+      await setFirstConnectedAtIfMissing(new Date().toISOString());
+    }
+  } catch {
+    /* ignore */
+  }
 }

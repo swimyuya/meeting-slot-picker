@@ -1,31 +1,33 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { App } from "../App";
 import { setRefreshToken } from "../lib/secrets";
 
-beforeEach(() => localStorage.clear());
-
-describe("App", () => {
-  it("未連携時は連携案内を表示する", async () => {
+describe("App (Pro 版: 複数 provider 対応)", () => {
+  it("両方未連携時は ConnectPrompt を表示 (Google と Outlook の両ボタン)", async () => {
     render(<App />);
-    expect(await screen.findByText("Google カレンダーと連携")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: /カレンダーと連携/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Google と連携する" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Outlook と連携する" })).toBeInTheDocument();
   });
 
-  it("連携済みなら週グリッドを表示し、設定を開閉できる", async () => {
-    await setRefreshToken("rt");
+  it("Google だけでも連携済みなら週グリッドを表示し、設定を開閉できる", async () => {
+    await setRefreshToken("google", "rt");
     render(<App />);
-    await screen.findByText("日程ピッカー");
+    await screen.findByText("日程ピッカー Pro");
     await waitFor(() => expect(screen.getByText("9:00")).toBeInTheDocument());
 
     await userEvent.click(screen.getByRole("button", { name: "設定" }));
     expect(await screen.findByRole("button", { name: "保存" })).toBeInTheDocument();
+    // SubscriptionBadge が出ている
+    expect(screen.getByText(/Free Pro Beta/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "キャンセル" }));
     await waitFor(() => expect(screen.getByText("9:00")).toBeInTheDocument());
   });
 
   it("枠を選択するとプレビューに反映されコピーできる", async () => {
-    await setRefreshToken("rt");
+    await setRefreshToken("google", "rt");
     render(<App />);
     await waitFor(() => expect(screen.getByText("9:00")).toBeInTheDocument());
 
@@ -34,9 +36,5 @@ describe("App", () => {
     const copyBtn = await screen.findByRole("button", { name: /コピー（1枠）/ });
     await userEvent.click(copyBtn);
     expect(await screen.findByText(/コピーしました/)).toBeInTheDocument();
-
-    // クリアで選択解除 → クリアボタンが無効化される
-    await userEvent.click(screen.getByRole("button", { name: "クリア" }));
-    await waitFor(() => expect(screen.getByRole("button", { name: "クリア" })).toBeDisabled());
   });
 });

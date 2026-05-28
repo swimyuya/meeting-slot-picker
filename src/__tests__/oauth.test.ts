@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { buildAuthUrl, connectGoogle, exchangeCode, generatePkce } from "../auth/oauth";
+import { buildAuthUrl, connect, exchangeCode, generatePkce } from "../auth/oauth";
+import { GOOGLE_SPEC, MICROSOFT_SPEC } from "../auth/providers";
 import { getRefreshToken } from "../lib/secrets";
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -9,7 +10,11 @@ function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
-beforeEach(() => localStorage.clear());
+// secrets テストの global beforeEach (setup.ts) で IndexedDB がクリアされる前提
+
+beforeEach(() => {
+  // each test isolated
+});
 
 describe("generatePkce", () => {
   it("base64url の verifier と、それと異なる S256 challenge を返す", async () => {
@@ -22,12 +27,12 @@ describe("generatePkce", () => {
 });
 
 describe("buildAuthUrl", () => {
-  it("必要なパラメータを全て含む", () => {
+  it("Google: 必要なパラメータを含み access_type=offline / prompt=consent を入れる", () => {
     const url = new URL(
-      buildAuthUrl({
+      buildAuthUrl(GOOGLE_SPEC, {
         clientId: "cid",
         redirectUri: "http://127.0.0.1:4321",
-        scope: "https://www.googleapis.com/auth/calendar.readonly",
+        scope: "openid email https://www.googleapis.com/auth/calendar.readonly",
         challenge: "ch",
         state: "st",
       }),
@@ -43,44 +48,98 @@ describe("buildAuthUrl", () => {
     expect(p.get("code_challenge_method")).toBe("S256");
     expect(p.get("state")).toBe("st");
   });
+
+  it("Microsoft: login.microsoftonline.com に向き prompt=select_account を入れる", () => {
+    const url = new URL(
+      buildAuthUrl(MICROSOFT_SPEC, {
+        clientId: "ms-cid",
+        redirectUri: "http://127.0.0.1:4322",
+        scope: MICROSOFT_SPEC.defaultScope,
+        challenge: "ch",
+        state: "st",
+      }),
+    );
+    expect(url.origin + url.pathname).toBe(
+      "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
+    );
+    expect(url.searchParams.get("prompt")).toBe("select_account");
+    expect(url.searchParams.get("scope")).toContain("offline_access");
+    expect(url.searchParams.get("scope")).toContain("Calendars.Read");
+  });
 });
 
 describe("exchangeCode", () => {
-  it("code を refresh_token に交換する (PKCE verifier を送る)", async () => {
-    const fetchFn = vi.fn().mockResolvedValue(jsonResponse({ refresh_token: "rt", access_token: "at" }));
+  it("Google: code を refresh_token に交換する", async () => {
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValue(jsonResponse({ refresh_token: "rt", access_token: "at" }));
     const out = await exchangeCode(
+      GOOGLE_SPEC,
       { clientId: "cid", code: "c", codeVerifier: "v", redirectUri: "http://127.0.0.1:4321" },
       { fetchFn },
     );
     expect(out.refreshToken).toBe("rt");
+    expect(fetchFn.mock.calls[0][0]).toBe(GOOGLE_SPEC.tokenEndpoint);
     const body = fetchFn.mock.calls[0][1].body as URLSearchParams;
     expect(body.get("grant_type")).toBe("authorization_code");
     expect(body.get("code_verifier")).toBe("v");
     expect(body.get("code")).toBe("c");
   });
 
-  it("refresh_token が無ければ throw する", async () => {
+  it("Microsoft: token endpoint に向ける", async () => {
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValue(jsonResponse({ refresh_token: "rt", access_token: "at" }));
+    await exchangeCode(
+      MICROSOFT_SPEC,
+      { clientId: "cid", code: "c", codeVerifier: "v", redirectUri: "http://127.0.0.1:4322" },
+      { fetchFn },
+    );
+    expect(fetchFn.mock.calls[0][0]).toBe(MICROSOFT_SPEC.tokenEndpoint);
+  });
+
+  it("refresh_token が無ければ provider 既定メッセージで throw する", async () => {
     const fetchFn = vi.fn().mockResolvedValue(jsonResponse({ access_token: "at" }));
     await expect(
-      exchangeCode({ clientId: "cid", code: "c", codeVerifier: "v", redirectUri: "r" }, { fetchFn }),
-    ).rejects.toThrow(/refresh_token/);
+      exchangeCode(
+        GOOGLE_SPEC,
+        { clientId: "cid", code: "c", codeVerifier: "v", redirectUri: "r" },
+        { fetchFn },
+      ),
+    ).rejects.toThrow(/Google/);
   });
 });
 
-describe("connectGoogle", () => {
-  it("コード取得→交換→Keychain 保存まで実行する", async () => {
-    const fetchFn = vi.fn().mockResolvedValue(jsonResponse({ refresh_token: "rt-xyz", access_token: "at" }));
+describe("connect (Tauri 経路)", () => {
+  it("コード取得→交換→Keychain 保存まで実行する (Google)", async () => {
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValue(jsonResponse({ refresh_token: "rt-xyz", access_token: "at" }));
     const captureCode = vi.fn().mockResolvedValue("auth-code");
-    await connectGoogle({ clientId: "cid" }, { fetchFn, captureCode });
+    await connect("google", { clientId: "cid" }, { fetchFn, captureCode });
     expect(captureCode).toHaveBeenCalledWith(
       4321,
       expect.stringContaining("accounts.google.com"),
       expect.any(String),
     );
-    expect(await getRefreshToken()).toBe("rt-xyz");
+    expect(await getRefreshToken("google")).toBe("rt-xyz");
+  });
+
+  it("Microsoft でも同様 (port=4322, MS endpoint)", async () => {
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValue(jsonResponse({ refresh_token: "ms-rt", access_token: "at" }));
+    const captureCode = vi.fn().mockResolvedValue("ms-code");
+    await connect("microsoft", { clientId: "ms-cid" }, { fetchFn, captureCode });
+    expect(captureCode).toHaveBeenCalledWith(
+      4322,
+      expect.stringContaining("login.microsoftonline.com"),
+      expect.any(String),
+    );
+    expect(await getRefreshToken("microsoft")).toBe("ms-rt");
   });
 
   it("clientId 未設定は throw する", async () => {
-    await expect(connectGoogle({ clientId: "" })).rejects.toThrow(/CLIENT_ID/);
+    await expect(connect("google", { clientId: "" })).rejects.toThrow(/CLIENT/i);
   });
 });

@@ -1,13 +1,13 @@
 [package]
-name = "meeting-slot-picker"
+name = "meeting-slot-picker-pro"
 version = "0.1.0"
-description = "日程調整スロットピッカー デスクトップアプリ"
+description = "日程ピッカー Pro — Google + Outlook 対応版"
 authors = ["yuya"]
 edition = "2021"
 rust-version = "1.77"
 
 [lib]
-name = "meeting_slot_picker_lib"
+name = "meeting_slot_picker_pro_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { PROVIDER_IDS, type ProviderId } from "./auth/providers";
 import { ConnectPrompt } from "./components/ConnectPrompt";
 import { MobileDayView } from "./components/MobileDayView";
 import { SettingsPanel } from "./components/SettingsPanel";
@@ -8,15 +9,15 @@ import { WeekGrid } from "./components/WeekGrid";
 import { format } from "./domain/formatter";
 import { collectSelectedSlots } from "./domain/selectors";
 import { applyEvents, buildSlotGrid, deriveEffectiveOptions } from "./domain/slots";
-import { useAuthStatus } from "./hooks/useAuthStatus";
 import { useBusyTimes } from "./hooks/useBusyTimes";
 import { useConfig } from "./hooks/useConfig";
 import { useMediaQuery } from "./hooks/useMediaQuery";
+import { useProviderStatus } from "./hooks/useProviderStatus";
 import { useSelection } from "./hooks/useSelection";
 import { useShortcut } from "./hooks/useShortcut";
 import { useUpdater } from "./hooks/useUpdater";
 import { copyText } from "./lib/clipboard";
-import { isClientIdConfigured } from "./lib/env";
+import { isGoogleConfigured, isMicrosoftConfigured } from "./lib/env";
 import { isTauri } from "./lib/tauri";
 import { CallbackPage } from "./pages/CallbackPage";
 
@@ -32,9 +33,9 @@ export function App() {
 function MainApp() {
   const [now, setNow] = useState(() => new Date());
   const { config, loaded, update } = useConfig();
-  const { connected, busy: authBusy, error: authError, connect, disconnect } = useAuthStatus();
-  const { events, loading, error: busyError, reload } = useBusyTimes(
-    connected === true,
+  const providerStatus = useProviderStatus();
+  const { events, loading, errors: busyErrors, reload } = useBusyTimes(
+    providerStatus.connected,
     config,
     now,
   );
@@ -68,12 +69,10 @@ function MainApp() {
   // OAuth 連携中はフォーカス喪失で隠さない (ブラウザに移ると消えてしまうのを防ぐ)。
   const connectingRef = useRef(false);
   useEffect(() => {
-    connectingRef.current = authBusy;
-  }, [authBusy]);
+    connectingRef.current = providerStatus.busy !== null;
+  }, [providerStatus.busy]);
 
-  // メニューバー常駐の挙動 (Tauri のみ):
-  //  - 開く (フォーカス取得) たびに now を更新 → 当日基準でグリッド/予定を再取得
-  //  - フォーカス喪失 / Esc で隠す (連携中を除く)
+  // メニューバー常駐の挙動 (Tauri のみ)
   useEffect(() => {
     if (!isTauri()) return;
     let cancelled = false;
@@ -105,6 +104,25 @@ function MainApp() {
     };
   }, []);
 
+  const configMissing = useMemo<Record<ProviderId, boolean>>(
+    () => ({ google: !isGoogleConfigured(), microsoft: !isMicrosoftConfigured() }),
+    [],
+  );
+
+  // 連携済 provider がひとつでもあれば main app、ゼロなら ConnectPrompt
+  const showConnectPrompt = providerStatus.allKnown && !providerStatus.hasAny;
+  const showLoading = !loaded || !providerStatus.allKnown;
+
+  // 表示用の合計 busy 数とエラー文字列 (複数 provider のうち最初のエラーを表示)
+  const aggregatedBusyError = useMemo(() => {
+    const e: string[] = [];
+    for (const p of PROVIDER_IDS) {
+      const msg = busyErrors[p];
+      if (msg) e.push(`${p === "microsoft" ? "Outlook" : "Google"}: ${msg}`);
+    }
+    return e.length > 0 ? e.join(" / ") : null;
+  }, [busyErrors]);
+
   return (
     <div className="flex h-full flex-col">
       <header
@@ -113,7 +131,7 @@ function MainApp() {
         className="flex cursor-grab items-center justify-between border-b bg-gray-50 px-3 py-2 select-none active:cursor-grabbing"
       >
         <span data-tauri-drag-region className="text-xs font-semibold text-gray-700">
-          日程ピッカー
+          日程ピッカー Pro
         </span>
         <span data-tauri-drag-region className="text-[10px] text-gray-400">
           {config.shortcut
@@ -134,19 +152,25 @@ function MainApp() {
         />
       )}
 
-      {!loaded || connected === null ? (
+      {showLoading ? (
         <div className="flex flex-1 items-center justify-center text-sm text-gray-400">
           読み込み中…
         </div>
-      ) : connected === false ? (
+      ) : showConnectPrompt ? (
         <ConnectPrompt
-          onConnect={() => void connect()}
-          busy={authBusy}
-          error={authError}
-          clientIdMissing={!isClientIdConfigured()}
+          onConnect={(p) => void providerStatus.connect(p)}
+          busy={providerStatus.busy}
+          errors={providerStatus.error}
+          configMissing={configMissing}
         />
       ) : showSettings ? (
-        <SettingsPanel config={config} onSave={update} onClose={() => setShowSettings(false)} />
+        <SettingsPanel
+          config={config}
+          onSave={update}
+          onClose={() => setShowSettings(false)}
+          providerStatus={providerStatus}
+          configMissing={configMissing}
+        />
       ) : (
         <>
           {isMobile ? (
@@ -170,13 +194,13 @@ function MainApp() {
             preview={preview}
             count={selectedSlots.length}
             loading={loading}
-            error={busyError}
+            error={aggregatedBusyError}
             busyCount={events.length}
             onCopy={handleCopy}
             onClear={clearAll}
             onReload={reload}
             onSettings={() => setShowSettings(true)}
-            onDisconnect={() => void disconnect()}
+            onDisconnect={() => void providerStatus.disconnect("google")}
           />
         </>
       )}

@@ -27,7 +27,7 @@ export async function fetchBusyBetween(
   deps: FreeBusyDeps = {},
 ): Promise<BusySlot[]> {
   const fetchFn = deps.fetchFn ?? httpFetch;
-  const token = await getAccessToken(input.auth, { fetchFn, now: deps.now });
+  const token = await getAccessToken("google", input.auth, { fetchFn, now: deps.now });
 
   const res = await fetchFn(FREEBUSY_ENDPOINT, {
     method: "POST",

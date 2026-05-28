@@ -1,23 +1,31 @@
 /**
- * Google OAuth (Desktop / loopback + PKCE) フロー。
+ * Tauri (デスクトップ) 用 OAuth フロー — loopback + PKCE。
  *
- * 1. PKCE (verifier / S256 challenge) を生成
- * 2. 認可 URL を組み立て、Rust 側 (oauth_capture_code) がループバックサーバ起動＋ブラウザを開く
- * 3. リダイレクトの ?code= を受け取り、token endpoint で refresh_token に交換
- * 4. refresh_token を Keychain に保存
+ * Pro 版では provider (Google / Microsoft) を引数で受け取り、各々の
+ * 認可エンドポイント / tokenエンドポイント / scope に応じて動作する。
  *
- * 認可 URL / token 交換は line-reply-drafter/scripts/google-auth.mjs を基にしている。
+ * フロー:
+ *   1. PKCE (verifier / S256 challenge) を生成
+ *   2. 認可 URL を組み立て、Rust 側 (oauth_capture_code) が loopback サーバ起動＋ブラウザを開く
+ *   3. リダイレクトの ?code= を受け取り、token endpoint で refresh_token に交換
+ *   4. refresh_token を Keychain に provider 別キーで保存
+ *   5. id_token から email を取り出して identity ストアに保存 (将来のサブスク用)
+ *
+ * Web (PWA) / Chrome 拡張ランタイムでは、各々のフローへ自動 dispatch する。
  */
 
 import { getWebRedirectUri } from "../lib/env";
 import { httpFetch, safeErrorBody, type HttpFetch } from "../lib/http";
-import { setRefreshToken } from "../lib/secrets";
+import {
+  setFirstConnectedAtIfMissing,
+  setProviderForIdentity,
+  setRefreshToken,
+  setUserEmail,
+} from "../lib/secrets";
 import { isExtension, isTauri } from "../lib/tauri";
+import { emailFromIdToken } from "./identity";
+import { getProviderSpec, type ProviderId, type ProviderOAuthSpec } from "./providers";
 
-const AUTH_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth";
-const TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
-export const DEFAULT_SCOPE = "https://www.googleapis.com/auth/calendar.readonly";
-const DEFAULT_PORT = 4321;
 const DEFAULT_TIMEOUT_SECS = 180;
 
 export interface OAuthConfig {
@@ -29,7 +37,7 @@ export interface OAuthConfig {
 
 export interface OAuthDeps {
   fetchFn?: HttpFetch;
-  /** ループバックでリダイレクトを待ち受け code を返す (既定: Rust コマンド)。 */
+  /** loopback でリダイレクトを待ち受け code を返す (既定: Rust コマンド)。 */
   captureCode?: (port: number, authUrl: string, expectedState: string) => Promise<string>;
 }
 
@@ -43,30 +51,50 @@ export async function generatePkce(): Promise<{ verifier: string; challenge: str
   return { verifier, challenge };
 }
 
-/** 認可 URL を組み立てる。 */
-export function buildAuthUrl(params: {
+/**
+ * 認可 URL を組み立てる。provider 仕様 (extraAuthParams) を反映するので
+ * Google の access_type=offline / Microsoft の prompt=select_account も入る。
+ */
+export function buildAuthUrl(
+  spec: ProviderOAuthSpec,
+  params: {
+    clientId: string;
+    redirectUri: string;
+    scope: string;
+    challenge: string;
+    state: string;
+  },
+): string {
+  const q = new URLSearchParams({
+    client_id: params.clientId,
+    redirect_uri: params.redirectUri,
+    response_type: "code",
+    scope: params.scope,
+    state: params.state,
+    code_challenge: params.challenge,
+    code_challenge_method: "S256",
+  });
+  // provider 固有の追加クエリ (access_type=offline / prompt=consent 等)
+  for (const [k, v] of Object.entries(spec.extraAuthParams ?? {})) {
+    q.set(k, v);
+  }
+  return `${spec.authEndpoint}?${q.toString()}`;
+}
+
+/** Google legacy 用 buildAuthUrl 互換ラッパー (Google エンドポイント決め打ち)。 */
+export function buildAuthUrlLegacyGoogle(params: {
   clientId: string;
   redirectUri: string;
   scope: string;
   challenge: string;
   state: string;
 }): string {
-  const q = new URLSearchParams({
-    client_id: params.clientId,
-    redirect_uri: params.redirectUri,
-    response_type: "code",
-    scope: params.scope,
-    access_type: "offline",
-    prompt: "consent",
-    state: params.state,
-    code_challenge: params.challenge,
-    code_challenge_method: "S256",
-  });
-  return `${AUTH_ENDPOINT}?${q.toString()}`;
+  return buildAuthUrl(getProviderSpec("google"), params);
 }
 
 /** authorization code を token endpoint で交換し refresh_token を得る。 */
 export async function exchangeCode(
+  spec: ProviderOAuthSpec,
   input: {
     clientId: string;
     clientSecret?: string;
@@ -75,7 +103,7 @@ export async function exchangeCode(
     redirectUri: string;
   },
   deps: { fetchFn?: HttpFetch } = {},
-): Promise<{ refreshToken: string; accessToken: string }> {
+): Promise<{ refreshToken: string; accessToken: string; idToken: string | undefined }> {
   const fetchFn = deps.fetchFn ?? httpFetch;
   const body = new URLSearchParams({
     code: input.code,
@@ -86,7 +114,7 @@ export async function exchangeCode(
   });
   if (input.clientSecret) body.set("client_secret", input.clientSecret);
 
-  const res = await fetchFn(TOKEN_ENDPOINT, {
+  const res = await fetchFn(spec.tokenEndpoint, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body,
@@ -94,35 +122,51 @@ export async function exchangeCode(
   if (!res.ok) {
     throw new Error(`oauth token exchange failed: ${res.status} ${await safeErrorBody(res)}`);
   }
-  const json = (await res.json()) as { refresh_token?: string; access_token?: string };
+  const json = (await res.json()) as {
+    refresh_token?: string;
+    access_token?: string;
+    id_token?: string;
+  };
   if (!json.refresh_token) {
-    throw new Error(
-      "refresh_token が返りませんでした。Google アカウント設定でアクセスを一度解除してから再試行してください。",
-    );
+    throw new Error(spec.noRefreshTokenMessage);
   }
-  return { refreshToken: json.refresh_token, accessToken: json.access_token ?? "" };
+  return {
+    refreshToken: json.refresh_token,
+    accessToken: json.access_token ?? "",
+    idToken: json.id_token,
+  };
 }
 
 /**
- * OAuth フロー全体を実行する。
- * - Tauri: ループバックで code 取得 → token 交換 → Keychain 保存 (この関数内で完結)
- * - Chrome 拡張: chrome.identity.launchWebAuthFlow で code 取得 → /api/auth/exchange (signInExtension)
- * - Web (PWA): signInWeb に委譲して redirect (この関数は return しない、callback で完了)
+ * OAuth フロー全体を実行する (provider 引数化版)。
+ *
+ * 実行環境による dispatch:
+ *   - Chrome 拡張機能 → signInExtension(provider, ...)
+ *   - Web (PWA)      → signInWeb(provider, ...) (リダイレクトして return しない)
+ *   - Tauri          → loopback で完結 (本関数内)
  */
-export async function connectGoogle(config: OAuthConfig, deps: OAuthDeps = {}): Promise<void> {
+export async function connect(
+  provider: ProviderId,
+  config: OAuthConfig,
+  deps: OAuthDeps = {},
+): Promise<void> {
   if (!config.clientId) {
-    throw new Error("VITE_GOOGLE_CLIENT_ID が未設定です (.env.local を確認してください)。");
+    throw new Error(
+      `${getProviderSpec(provider).displayName}: client_id が未設定です (.env.local を確認してください)。`,
+    );
   }
+  const spec = getProviderSpec(provider);
+
   // テスト時は deps.captureCode が指定されるので、その場合は Tauri 経路に流す。
   if (!deps.captureCode) {
     if (isExtension()) {
       const { signInExtension } = await import("./oauth-extension");
-      await signInExtension({ clientId: config.clientId, scope: config.scope });
+      await signInExtension(provider, { clientId: config.clientId, scope: config.scope });
       return;
     }
     if (!isTauri()) {
       const { signInWeb } = await import("./oauth-web");
-      await signInWeb({
+      await signInWeb(provider, {
         clientId: config.clientId,
         redirectUri: getWebRedirectUri(),
         scope: config.scope,
@@ -131,19 +175,27 @@ export async function connectGoogle(config: OAuthConfig, deps: OAuthDeps = {}): 
     }
   }
 
-  const port = config.port ?? DEFAULT_PORT;
-  const scope = config.scope ?? DEFAULT_SCOPE;
+  // Tauri loopback フロー
+  const port = config.port ?? spec.defaultPort;
+  const scope = config.scope ?? spec.defaultScope;
   // RFC 8252 準拠で 127.0.0.1 を使う (localhost だと IPv6 解決で取りこぼす恐れ)。
   const redirectUri = `http://127.0.0.1:${port}`;
 
   const { verifier, challenge } = await generatePkce();
   const state = generateState();
-  const authUrl = buildAuthUrl({ clientId: config.clientId, redirectUri, scope, challenge, state });
+  const authUrl = buildAuthUrl(spec, {
+    clientId: config.clientId,
+    redirectUri,
+    scope,
+    challenge,
+    state,
+  });
 
   const capture = deps.captureCode ?? defaultCaptureCode;
   const code = await capture(port, authUrl, state);
 
-  const { refreshToken } = await exchangeCode(
+  const { refreshToken, idToken } = await exchangeCode(
+    spec,
     {
       clientId: config.clientId,
       clientSecret: config.clientSecret,
@@ -153,8 +205,14 @@ export async function connectGoogle(config: OAuthConfig, deps: OAuthDeps = {}): 
     },
     { fetchFn: deps.fetchFn },
   );
-  await setRefreshToken(refreshToken);
+  await setRefreshToken(provider, refreshToken);
+  // サブスク将来化用に identity (email) を保存。失敗してもサインインは継続。
+  await persistIdentityIfPossible(provider, idToken);
 }
+
+/** 後方互換: Pro 版以前の API。連携する provider は Google 固定。 */
+export const connectGoogle = (config: OAuthConfig, deps: OAuthDeps = {}): Promise<void> =>
+  connect("google", config, deps);
 
 async function defaultCaptureCode(
   port: number,
@@ -170,16 +228,39 @@ async function defaultCaptureCode(
   });
 }
 
+/**
+ * id_token から email を取り出して保存。サブスク化したときに user 識別子として使う。
+ * 失敗しても OAuth 自体は成功扱いにする (cosmetic な情報なので)。
+ */
+export async function persistIdentityIfPossible(
+  provider: ProviderId,
+  idToken: string | undefined,
+): Promise<void> {
+  try {
+    const email = emailFromIdToken(idToken);
+    if (!email) return;
+    await setUserEmail(email);
+    await setProviderForIdentity(provider);
+    await setFirstConnectedAtIfMissing(new Date().toISOString());
+  } catch {
+    // 失敗は無視。connect 自体は成功させる
+  }
+}
+
 /** CSRF 対策の state (ランダム 16 バイト)。 */
-function generateState(): string {
+export function generateState(): string {
   const random = new Uint8Array(16);
   crypto.getRandomValues(random);
   return base64UrlEncode(random.buffer);
 }
 
-function base64UrlEncode(buffer: ArrayBuffer): string {
+export function base64UrlEncode(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer);
   let binary = "";
   for (const b of bytes) binary += String.fromCharCode(b);
   return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
+
+// 旧コードが import する DEFAULT_SCOPE は Google 用と意味づけて re-export しておく
+// (後方互換: 削除前提)。
+export const DEFAULT_SCOPE = getProviderSpec("google").defaultScope;

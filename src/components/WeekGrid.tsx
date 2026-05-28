@@ -103,7 +103,7 @@ export function WeekGrid({ columns, events, selection, onCellDown, onCellEnter }
                   onEnter={onCellEnter}
                 />
               ))}
-              {/* 時刻予定バー */}
+              {/* 時刻予定バー (source で薄く色分け: Google=グレー, Microsoft=水色) */}
               {layouts.map((layout) => {
                 const rawTop = ((layout.startMs - gridStartMs) / SLOT_DURATION_MS) * SLOT_HEIGHT_PX;
                 const rawBottom = ((layout.endMs - gridStartMs) / SLOT_DURATION_MS) * SLOT_HEIGHT_PX;
@@ -114,12 +114,18 @@ export function WeekGrid({ columns, events, selection, onCellDown, onCellEnter }
                 const leftPct = (layout.lane / layout.laneCount) * 100;
                 const startStr = toHHMM(new Date(layout.event.start));
                 const endStr = toHHMM(new Date(layout.event.end));
+                const isMs = layout.event.source === "microsoft";
+                const colorCls = isMs
+                  ? "border-sky-400/40 bg-sky-200/55"
+                  : "border-gray-400/40 bg-gray-300/55";
+                const titleText = `${startStr}-${endStr} ${isMs ? "Outlook: " : ""}${layout.event.summary}`;
                 return (
                   <div
                     key={layout.event.id}
                     data-event-id={layout.event.id}
-                    title={`${startStr}-${endStr} ${layout.event.summary}`}
-                    className="pointer-events-none absolute z-10 overflow-hidden rounded border border-gray-400/40 bg-gray-300/55 px-1 text-[10px] leading-tight text-gray-900"
+                    data-event-source={layout.event.source ?? "google"}
+                    title={titleText}
+                    className={`pointer-events-none absolute z-10 overflow-hidden rounded border px-1 text-[10px] leading-tight text-gray-900 ${colorCls}`}
                     style={{
                       top,
                       height,

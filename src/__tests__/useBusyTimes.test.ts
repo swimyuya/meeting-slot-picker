@@ -5,15 +5,19 @@ import { DEFAULT_CONFIG } from "../lib/config";
 
 const now = new Date("2026-01-01T03:00:00Z");
 
-describe("useBusyTimes", () => {
-  it("未連携なら events は空でローディングしない", async () => {
-    const { result } = renderHook(() => useBusyTimes(false, DEFAULT_CONFIG, now));
+describe("useBusyTimes (Pro: 複数 provider)", () => {
+  it("両 provider 未連携なら events は空でローディングしない", async () => {
+    const { result } = renderHook(() =>
+      useBusyTimes({ google: false, microsoft: false }, DEFAULT_CONFIG, now),
+    );
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.events).toEqual([]);
   });
 
-  it("clientId 未設定なら連携済みでも events は空", async () => {
-    const { result } = renderHook(() => useBusyTimes(true, DEFAULT_CONFIG, now));
+  it("connected=null (確認中) なら events は空", async () => {
+    const { result } = renderHook(() =>
+      useBusyTimes({ google: null, microsoft: null }, DEFAULT_CONFIG, now),
+    );
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.events).toEqual([]);
   });

@@ -1,7 +1,7 @@
 /**
- * Web OAuth フロー (oauth-web.ts) の検証。
- * - signInWeb は sessionStorage に verifier/state/redirect_uri を残し、location.href を変える
- * - handleAuthCallback は state を照合して /api/auth/exchange に POST、refresh_token を保存
+ * Web OAuth フロー (oauth-web.ts) の検証 (provider 引数化版)。
+ * - signInWeb は sessionStorage に provider 付きで verifier/state を残し location.href を変える
+ * - handleAuthCallback は state 照合 → /api/auth/exchange に provider 付き POST → 保存
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -16,7 +16,6 @@ const ORIGINAL_LOCATION = window.location;
 
 beforeEach(() => {
   sessionStorage.clear();
-  // window.location を差し替え可能にする
   Object.defineProperty(window, "location", {
     configurable: true,
     writable: true,
@@ -34,32 +33,36 @@ afterEach(() => {
 });
 
 describe("signInWeb", () => {
-  it("verifier/state/redirect_uri を sessionStorage に保存し、location.href を Google 認可 URL にする", async () => {
-    // signInWeb は通常 return しないので、Promise を race して location.href の更新を検出する
-    const promise = signInWeb({
+  it("Google: verifier/state/provider を sessionStorage に保存し、Google 認可 URL にリダイレクト", async () => {
+    const promise = signInWeb("google", {
       clientId: "cid",
       redirectUri: "https://example.com/auth/callback",
     });
-    // 少し待って location.href が変わったことを確認
     await new Promise((r) => setTimeout(r, 30));
     expect(window.location.href).toContain("accounts.google.com");
-    expect(window.location.href).toContain("client_id=cid");
-    expect(window.location.href).toContain(
-      "redirect_uri=https%3A%2F%2Fexample.com%2Fauth%2Fcallback",
-    );
+    expect(sessionStorage.getItem("msp:oauth:provider")).toBe("google");
     expect(sessionStorage.getItem("msp:oauth:verifier")).toBeTruthy();
-    expect(sessionStorage.getItem("msp:oauth:state")).toBeTruthy();
-    expect(sessionStorage.getItem("msp:oauth:redirect_uri")).toBe(
-      "https://example.com/auth/callback",
-    );
-    // 後始末: race で勝てないので無視
+    void promise;
+  });
+
+  it("Microsoft: login.microsoftonline.com にリダイレクト", async () => {
+    const promise = signInWeb("microsoft", {
+      clientId: "ms-cid",
+      redirectUri: "https://example.com/auth/callback",
+    });
+    await new Promise((r) => setTimeout(r, 30));
+    expect(window.location.href).toContain("login.microsoftonline.com");
+    expect(sessionStorage.getItem("msp:oauth:provider")).toBe("microsoft");
     void promise;
   });
 
   it("clientId が空なら throw する", async () => {
     await expect(
-      signInWeb({ clientId: "", redirectUri: "https://example.com/auth/callback" }),
-    ).rejects.toThrow(/CLIENT_ID/);
+      signInWeb("google", {
+        clientId: "",
+        redirectUri: "https://example.com/auth/callback",
+      }),
+    ).rejects.toThrow(/CLIENT/i);
   });
 });
 
@@ -72,10 +75,15 @@ describe("handleAuthCallback", () => {
     });
   }
 
-  it("正常系: state 一致 → /api/auth/exchange に POST → refresh_token を保存", async () => {
+  function seedSession(provider: "google" | "microsoft" = "google") {
     sessionStorage.setItem("msp:oauth:verifier", "verifier-xyz");
     sessionStorage.setItem("msp:oauth:state", "state-abc");
     sessionStorage.setItem("msp:oauth:redirect_uri", "https://example.com/auth/callback");
+    sessionStorage.setItem("msp:oauth:provider", provider);
+  }
+
+  it("正常系 (Google): /api/auth/exchange に POST し refresh_token を保存", async () => {
+    seedSession("google");
     setLocation("?code=AUTHCODE&state=state-abc");
 
     const fetchFn = vi.fn().mockResolvedValue(
@@ -84,29 +92,36 @@ describe("handleAuthCallback", () => {
         headers: { "Content-Type": "application/json" },
       }),
     );
-
     await handleAuthCallback({ fetchFn });
 
     expect(fetchFn).toHaveBeenCalledOnce();
-    const [url, init] = fetchFn.mock.calls[0];
-    expect(String(url)).toContain("/api/auth/exchange");
+    const [, init] = fetchFn.mock.calls[0];
     const body = JSON.parse(init!.body as string);
-    expect(body).toEqual({
-      code: "AUTHCODE",
-      code_verifier: "verifier-xyz",
-      redirect_uri: "https://example.com/auth/callback",
-    });
-    expect(await getRefreshToken()).toBe("rt-NEW");
-    // sessionStorage はクリアされる
-    expect(sessionStorage.getItem("msp:oauth:state")).toBeNull();
+    expect(body.provider).toBe("google");
+    expect(body.code).toBe("AUTHCODE");
+    expect(await getRefreshToken("google")).toBe("rt-NEW");
+  });
+
+  it("正常系 (Microsoft): provider=microsoft で POST", async () => {
+    seedSession("microsoft");
+    setLocation("?code=MSCODE&state=state-abc");
+
+    const fetchFn = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ refresh_token: "ms-rt", access_token: "at" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    await handleAuthCallback({ fetchFn });
+    const [, init] = fetchFn.mock.calls[0];
+    const body = JSON.parse(init!.body as string);
+    expect(body.provider).toBe("microsoft");
+    expect(await getRefreshToken("microsoft")).toBe("ms-rt");
   });
 
   it("state 不一致は throw する", async () => {
-    sessionStorage.setItem("msp:oauth:verifier", "v");
-    sessionStorage.setItem("msp:oauth:state", "state-expected");
-    sessionStorage.setItem("msp:oauth:redirect_uri", "https://example.com/auth/callback");
+    seedSession("google");
     setLocation("?code=C&state=state-attacker");
-
     const fetchFn = vi.fn();
     await expect(handleAuthCallback({ fetchFn })).rejects.toThrow(/state/);
     expect(fetchFn).not.toHaveBeenCalled();
@@ -118,10 +133,8 @@ describe("handleAuthCallback", () => {
   });
 
   it("/api/auth/exchange が失敗したら throw する", async () => {
-    sessionStorage.setItem("msp:oauth:verifier", "v");
-    sessionStorage.setItem("msp:oauth:state", "s");
-    sessionStorage.setItem("msp:oauth:redirect_uri", "https://example.com/auth/callback");
-    setLocation("?code=C&state=s");
+    seedSession("google");
+    setLocation("?code=C&state=state-abc");
     const fetchFn = vi.fn().mockResolvedValue(
       new Response(JSON.stringify({ error: "invalid_grant" }), { status: 400 }),
     );

@@ -1,14 +1,23 @@
 import { useEffect, useState, type ReactNode } from "react";
+import type { ProviderId } from "../auth/providers";
+import type { useProviderStatus } from "../hooks/useProviderStatus";
 import { AppConfigSchema, type AppConfig } from "../lib/config";
+import { SubscriptionBadge } from "./SubscriptionBadge";
+
+type ProviderStatusReturn = ReturnType<typeof useProviderStatus>;
 
 interface Props {
   config: AppConfig;
   onSave: (next: AppConfig) => Promise<void>;
   onClose: () => void;
+  /** Pro 版: provider 連携状態。後方互換のため optional。 */
+  providerStatus?: ProviderStatusReturn;
+  /** Pro 版: provider 別 clientId 未設定フラグ。 */
+  configMissing?: Record<ProviderId, boolean>;
 }
 
-/** 表示範囲・出力テンプレート等の設定フォーム。 */
-export function SettingsPanel({ config, onSave, onClose }: Props) {
+/** 表示範囲・出力テンプレート等の設定フォーム + Pro 版で連携状態セクション。 */
+export function SettingsPanel({ config, onSave, onClose, providerStatus, configMissing }: Props) {
   const [draft, setDraft] = useState<AppConfig>(config);
   const [error, setError] = useState<string | null>(null);
 
@@ -28,7 +37,35 @@ export function SettingsPanel({ config, onSave, onClose }: Props) {
 
   return (
     <div className="flex-1 space-y-3 overflow-auto p-4 text-xs">
+      <SubscriptionBadge status="beta" />
+
       <h2 className="text-sm font-semibold text-gray-800">設定</h2>
+
+      {providerStatus && configMissing && (
+        <section className="space-y-2 rounded border border-gray-200 p-3">
+          <h3 className="text-xs font-semibold text-gray-700">連携状態</h3>
+          <ProviderRow
+            provider="google"
+            label="Google カレンダー"
+            connected={providerStatus.connected.google}
+            busy={providerStatus.busy === "google"}
+            disabled={configMissing.google}
+            error={providerStatus.error.google}
+            onConnect={() => void providerStatus.connect("google")}
+            onDisconnect={() => void providerStatus.disconnect("google")}
+          />
+          <ProviderRow
+            provider="microsoft"
+            label="Outlook カレンダー"
+            connected={providerStatus.connected.microsoft}
+            busy={providerStatus.busy === "microsoft"}
+            disabled={configMissing.microsoft}
+            error={providerStatus.error.microsoft}
+            onConnect={() => void providerStatus.connect("microsoft")}
+            onDisconnect={() => void providerStatus.disconnect("microsoft")}
+          />
+        </section>
+      )}
 
       <div className="grid grid-cols-2 gap-3">
         <Field label="開始時刻 (時)">
@@ -73,6 +110,63 @@ export function SettingsPanel({ config, onSave, onClose }: Props) {
           保存
         </button>
       </div>
+    </div>
+  );
+}
+
+function ProviderRow({
+  provider: _provider,
+  label,
+  connected,
+  busy,
+  disabled,
+  error,
+  onConnect,
+  onDisconnect,
+}: {
+  provider: ProviderId;
+  label: string;
+  connected: boolean | null;
+  busy: boolean;
+  disabled: boolean;
+  error: string | undefined;
+  onConnect: () => void;
+  onDisconnect: () => void;
+}) {
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs text-gray-700">
+          {connected === true ? "✓ " : "・ "} {label}
+        </span>
+        {connected === true ? (
+          <button
+            type="button"
+            onClick={onDisconnect}
+            disabled={busy}
+            className="rounded border border-gray-300 px-2 py-1 text-[11px] hover:bg-gray-50 disabled:opacity-40"
+          >
+            解除
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={onConnect}
+            disabled={busy || disabled}
+            className="rounded bg-gray-800 px-2 py-1 text-[11px] text-white hover:bg-gray-700 disabled:opacity-40"
+          >
+            {busy ? "連携中…" : "連携する"}
+          </button>
+        )}
+      </div>
+      {disabled && (
+        <p className="text-[10px] text-red-600">
+          {_provider === "google"
+            ? "VITE_GOOGLE_CLIENT_ID が未設定"
+            : "VITE_MICROSOFT_CLIENT_ID が未設定"}
+        </p>
+      )}
+      {error && <p className="text-[10px] text-red-600">{error}</p>}
     </div>
   );
 }

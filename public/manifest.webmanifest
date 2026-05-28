@@ -1,7 +1,7 @@
 {
-  "name": "日程ピッカー",
-  "short_name": "日程ピッカー",
-  "description": "Google カレンダーの空き時間を選んでクリップボードにコピーするツール",
+  "name": "日程ピッカー Pro",
+  "short_name": "日程ピッカー Pro",
+  "description": "Google + Outlook の空き時間を選んでクリップボードにコピーするツール",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

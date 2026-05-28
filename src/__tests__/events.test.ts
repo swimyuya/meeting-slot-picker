@@ -47,11 +47,12 @@ describe("fetchEventsBetween", () => {
     const out = await fetchEventsBetween(input, { fetchFn, now: () => 0 });
     expect(out).toEqual([
       {
-        id: "e1",
+        id: "g:e1",
         summary: "Meeting",
         start: "2026-01-01T01:00:00Z",
         end: "2026-01-01T02:00:00Z",
         allDay: false,
+        source: "google",
       },
     ]);
   });
@@ -65,7 +66,7 @@ describe("fetchEventsBetween", () => {
       }),
     );
     const out = await fetchEventsBetween(input, { fetchFn, now: () => 0 });
-    expect(out[0]).toMatchObject({ id: "h1", summary: "Holiday", allDay: true });
+    expect(out[0]).toMatchObject({ id: "g:h1", summary: "Holiday", allDay: true, source: "google" });
     expect(out[0].start).toBe("2026-01-01T00:00:00+09:00");
     expect(out[0].end).toBe("2026-01-02T00:00:00+09:00");
   });
