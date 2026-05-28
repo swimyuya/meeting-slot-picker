@@ -33,3 +33,4 @@ vitest.config.js
 .vercel
 dist-extension
 meeting-slot-picker-extension-*.zip
+.vercel-google-only-backup/
