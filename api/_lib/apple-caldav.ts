@@ -16,20 +16,15 @@
  *     rrule で展開しなおす
  */
 
-// tsdav: Vercel function は @vercel/node が CJS としてロードするため、namespace
-// import 経由でアクセスする (named import だと「export named X が無い」エラーになる)
-import * as tsdavRaw from "tsdav";
+// tsdav: package.json に "type": "module" が無いため Node ESM で .esm.js を読むと
+// CJS として解釈されて syntax error になる。createRequire で CJS 経由 (main =
+// dist/tsdav.cjs.js) で強制ロードしてバイパスする。
+import { createRequire } from "module";
 import * as ical from "node-ical";
 
-const tsdavModule = tsdavRaw as unknown as {
-  createDAVClient: typeof import("tsdav").createDAVClient;
-  default?: { createDAVClient?: typeof import("tsdav").createDAVClient };
-};
-const createDAVClient =
-  tsdavModule.createDAVClient ?? tsdavModule.default?.createDAVClient;
-if (!createDAVClient) {
-  throw new Error("tsdav: createDAVClient not found in module exports");
-}
+const requireCjs = createRequire(import.meta.url);
+const tsdavCjs = requireCjs("tsdav") as typeof import("tsdav");
+const { createDAVClient } = tsdavCjs;
 
 export interface AppleEventRaw {
   id: string;
