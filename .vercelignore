@@ -1,0 +1,25 @@
+# Tauri ビルド成果物 (Vercel には不要、巨大)
+src-tauri/target
+src-tauri/gen
+
+# tsc 出力 / vite build 出力
+.api-build
+dist
+
+# 開発・テスト
+node_modules
+test-results
+playwright-report
+playwright/.cache
+
+# OS / IDE
+.DS_Store
+.vscode
+
+# 環境変数 (Vercel 上で別途設定)
+.env
+.env.local
+.env.*.local
+
+# Vercel CLI 自身のメタ
+.vercel

@@ -6,8 +6,8 @@
 
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { z } from "zod";
-import { applyCors } from "../_lib/cors";
-import { loadGoogleConfig, refreshAccessToken } from "../_lib/google";
+import { applyCors } from "../_lib/cors.js";
+import { loadGoogleConfig, refreshAccessToken } from "../_lib/google.js";
 
 const BodySchema = z.object({
   refresh_token: z.string().min(1).max(2048),

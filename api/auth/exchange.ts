@@ -8,8 +8,8 @@
 
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { z } from "zod";
-import { applyCors } from "../_lib/cors";
-import { exchangeAuthCode, loadGoogleConfig } from "../_lib/google";
+import { applyCors } from "../_lib/cors.js";
+import { exchangeAuthCode, loadGoogleConfig } from "../_lib/google.js";
 
 const BodySchema = z.object({
   code: z.string().min(1).max(2048),
