@@ -1,0 +1,42 @@
+{
+  "manifest_version": 3,
+  "name": "日程ピッカー",
+  "short_name": "日程ピッカー",
+  "version": "0.1.0",
+  "description": "Google カレンダーの空き時間を選んでクリップボードにコピーするツール。メール・LINE で日程提案にそのまま貼り付け可能。",
+  "default_locale": "ja",
+  "minimum_chrome_version": "100",
+  "permissions": ["storage", "identity"],
+  "host_permissions": [
+    "https://www.googleapis.com/*",
+    "https://oauth2.googleapis.com/*",
+    "https://meeting-slot-picker.vercel.app/*"
+  ],
+  "action": {
+    "default_popup": "extension/popup.html",
+    "default_title": "日程ピッカー",
+    "default_icon": {
+      "16": "extension/icons/icon-16.png",
+      "48": "extension/icons/icon-48.png",
+      "128": "extension/icons/icon-128.png"
+    }
+  },
+  "icons": {
+    "16": "extension/icons/icon-16.png",
+    "48": "extension/icons/icon-48.png",
+    "128": "extension/icons/icon-128.png"
+  },
+  "commands": {
+    "_execute_action": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+U",
+        "mac": "Command+Shift+U"
+      },
+      "description": "日程ピッカーのポップアップを開く"
+    }
+  },
+  "background": {
+    "service_worker": "extension/background.ts",
+    "type": "module"
+  }
+}

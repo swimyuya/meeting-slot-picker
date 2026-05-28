@@ -31,3 +31,5 @@ vitest.config.js
 !.vscode/extensions.json
 /.api-build
 .vercel
+dist-extension
+meeting-slot-picker-extension-*.zip

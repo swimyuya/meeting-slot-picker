@@ -20,6 +20,10 @@ export function isAllowedOrigin(origin: string | undefined): boolean {
   // Vercel preview: https://<branch>-<hash>-<scope>.vercel.app
   if (process.env.VERCEL_URL && origin === `https://${process.env.VERCEL_URL}`) return true;
   if (/^https:\/\/[a-z0-9-]+\.vercel\.app$/i.test(origin)) return true;
+  // Chrome 拡張機能 (Manifest V3 fetch の Origin)。
+  // extension-id は a-p 32 文字 (公開時は Chrome Web Store が割当て、
+  // dev では manifest.key 由来 or 読込パス由来) なので形式チェックのみ。
+  if (/^chrome-extension:\/\/[a-p]{32}$/i.test(origin)) return true;
   return false;
 }
 

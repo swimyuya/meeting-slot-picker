@@ -22,6 +22,7 @@
 ## 動作環境
 
 - **macOS 版**: macOS 11 (Big Sur) 以上 / Intel・Apple Silicon どちらも対応 (Universal Binary)
+- **Windows 版 (Chrome 拡張機能)**: Chrome / Edge / Brave / Opera など Chromium 系ブラウザ
 - **Web 版 (PWA)**: iOS / iPadOS Safari、最新の Chrome / Edge / Firefox。「ホーム画面に追加」でアプリ風に常駐可能
 
 ## インストール（エンドユーザー向け）
@@ -51,6 +52,41 @@ Google カレンダー読み取り権限を使うため、配布者（メンテ�
 2. **`Ctrl+Shift+U`** または **トレイアイコンクリック** でポップアップが開く
 3. 「**Google と連携する**」→ ブラウザで同意 → アプリに戻る
 4. グリッドに自分の予定が重なって表示される → 空き枠をクリック／ドラッグで選択 → **「コピー（N 枠）」** → 任意のテキストアプリに貼り付け
+
+## Windows / Chrome 拡張機能版の使い方
+
+### 1. Chrome Web Store からインストール
+
+[Chrome Web Store の日程ピッカーページ](https://chrome.google.com/webstore/detail/<extension-id>)
+→ **「Chrome に追加」** をクリック → **「拡張機能を追加」** で完了
+
+> Edge / Brave / Opera 等の Chromium 系ブラウザでも、Chrome Web Store の拡張機能をインストールできます。
+
+### 2. ツールバーにピン留め（推奨）
+
+- ツールバーの **パズルピース** をクリック → 「日程ピッカー」の **ピン**アイコンをクリック → ツールバーに常設
+
+### 3. グローバルショートカットを有効化（推奨）
+
+既定の `Ctrl+Shift+U`（macOS は `Command+Shift+U`）は **Chrome がフォーカスされているときのみ** 効きます。OS 全体で効くようにするには:
+
+1. アドレスバーに `chrome://extensions/shortcuts` を入力
+2. 「日程ピッカー」の「日程ピッカーのポップアップを開く」の右側ドロップダウンで **「グローバル」** を選択
+
+これで他のアプリを使っているときでも、ショートカットで呼び出せます。
+
+### 4. 連携と利用開始
+
+1. ツールバーアイコン or `Ctrl+Shift+U` でポップアップが開く
+2. 「**Google と連携する**」→ Google の同意画面（Chrome ポップアップ内に表示） → 戻ってきたら連携完了
+3. 30 分枠をクリック / ドラッグで選択 → 「**コピー（N 枠）**」→ メール / LINE に貼り付け
+
+### 既知の制約
+
+- iOS Safari / Firefox ではインストール不可（iOS は PWA、macOS ネイティブが好みなら .dmg を利用）。
+- グローバルショートカット既定値が他アプリと競合する場合は `chrome://extensions/shortcuts` から自由に変更可能。
+
+---
 
 ## iPhone / Web 版の使い方
 

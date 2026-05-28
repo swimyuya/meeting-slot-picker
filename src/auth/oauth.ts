@@ -12,7 +12,7 @@
 import { getWebRedirectUri } from "../lib/env";
 import { httpFetch, safeErrorBody, type HttpFetch } from "../lib/http";
 import { setRefreshToken } from "../lib/secrets";
-import { isTauri } from "../lib/tauri";
+import { isExtension, isTauri } from "../lib/tauri";
 
 const AUTH_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
@@ -106,23 +106,29 @@ export async function exchangeCode(
 /**
  * OAuth フロー全体を実行する。
  * - Tauri: ループバックで code 取得 → token 交換 → Keychain 保存 (この関数内で完結)
- * - Web: signInWeb に委譲して Google 同意画面へリダイレクト (この関数は return しない)。
- *        token 交換と refresh_token 保存は /auth/callback で実行される (handleAuthCallback)。
+ * - Chrome 拡張: chrome.identity.launchWebAuthFlow で code 取得 → /api/auth/exchange (signInExtension)
+ * - Web (PWA): signInWeb に委譲して redirect (この関数は return しない、callback で完了)
  */
 export async function connectGoogle(config: OAuthConfig, deps: OAuthDeps = {}): Promise<void> {
   if (!config.clientId) {
     throw new Error("VITE_GOOGLE_CLIENT_ID が未設定です (.env.local を確認してください)。");
   }
-  // Web ランタイムでは redirect 方式に切替 (Vercel API バックエンドが token 交換を担う)。
   // テスト時は deps.captureCode が指定されるので、その場合は Tauri 経路に流す。
-  if (!isTauri() && !deps.captureCode) {
-    const { signInWeb } = await import("./oauth-web");
-    await signInWeb({
-      clientId: config.clientId,
-      redirectUri: getWebRedirectUri(),
-      scope: config.scope,
-    });
-    return;
+  if (!deps.captureCode) {
+    if (isExtension()) {
+      const { signInExtension } = await import("./oauth-extension");
+      await signInExtension({ clientId: config.clientId, scope: config.scope });
+      return;
+    }
+    if (!isTauri()) {
+      const { signInWeb } = await import("./oauth-web");
+      await signInWeb({
+        clientId: config.clientId,
+        redirectUri: getWebRedirectUri(),
+        scope: config.scope,
+      });
+      return;
+    }
   }
 
   const port = config.port ?? DEFAULT_PORT;
