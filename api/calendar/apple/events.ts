@@ -54,8 +54,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   } catch (e) {
     const msg = e instanceof Error ? e.message : "unknown";
     console.error("[/api/calendar/apple/events]", msg);
-    // tsdav は 401/403 で具体的なエラーを投げるので識別する
-    if (/401|403|unauthor|invalid/i.test(msg)) {
+    // tsdav は認証失敗を様々なメッセージで表現する:
+    //   - "401", "403", "Unauthorized"
+    //   - "cannot find principalUrl" (iCloud が credential を拒否したとき)
+    //   - "invalid" 系
+    if (/401|403|unauthor|invalid|principal/i.test(msg)) {
       res.status(401).json({ error: "invalid_credentials" });
       return;
     }
