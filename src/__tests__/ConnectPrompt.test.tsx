@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ConnectPrompt } from "../components/ConnectPrompt";
 
 const noErrors = {};
-const allConfigured = { google: false, microsoft: false };
+const allConfigured = { google: false, microsoft: false, apple: false };
 
 describe("ConnectPrompt (Pro 版: Google + Outlook 両ボタン)", () => {
   it("Google ボタンで provider=google が渡る", async () => {
@@ -41,7 +41,7 @@ describe("ConnectPrompt (Pro 版: Google + Outlook 両ボタン)", () => {
         onConnect={vi.fn()}
         busy={null}
         errors={noErrors}
-        configMissing={{ google: true, microsoft: false }}
+        configMissing={{ google: true, microsoft: false, apple: false }}
       />,
     );
     expect(screen.getByRole("button", { name: "Google と連携する" })).toBeDisabled();

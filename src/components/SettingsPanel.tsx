@@ -14,10 +14,19 @@ interface Props {
   providerStatus?: ProviderStatusReturn;
   /** Pro 版: provider 別 clientId 未設定フラグ。 */
   configMissing?: Record<ProviderId, boolean>;
+  /** Apple 連携モーダルを開く (apple は OAuth ではないため親で制御)。 */
+  onOpenAppleModal?: () => void;
 }
 
 /** 表示範囲・出力テンプレート等の設定フォーム + Pro 版で連携状態セクション。 */
-export function SettingsPanel({ config, onSave, onClose, providerStatus, configMissing }: Props) {
+export function SettingsPanel({
+  config,
+  onSave,
+  onClose,
+  providerStatus,
+  configMissing,
+  onOpenAppleModal,
+}: Props) {
   const [draft, setDraft] = useState<AppConfig>(config);
   const [error, setError] = useState<string | null>(null);
 
@@ -63,6 +72,16 @@ export function SettingsPanel({ config, onSave, onClose, providerStatus, configM
             error={providerStatus.error.microsoft}
             onConnect={() => void providerStatus.connect("microsoft")}
             onDisconnect={() => void providerStatus.disconnect("microsoft")}
+          />
+          <ProviderRow
+            provider="apple"
+            label="Apple Calendar"
+            connected={providerStatus.connected.apple}
+            busy={providerStatus.busy === "apple"}
+            disabled={false}
+            error={providerStatus.error.apple}
+            onConnect={() => onOpenAppleModal?.()}
+            onDisconnect={() => void providerStatus.disconnect("apple")}
           />
         </section>
       )}

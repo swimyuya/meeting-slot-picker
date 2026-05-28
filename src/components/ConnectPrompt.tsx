@@ -8,26 +8,25 @@ interface Props {
   busy: ProviderId | null;
   /** provider 別エラー。 */
   errors: ProviderError;
-  /** provider 別の clientId 未設定フラグ。 */
+  /** provider 別の clientId 未設定フラグ (Apple は常に false)。 */
   configMissing: Record<ProviderId, boolean>;
 }
 
 /**
- * 未連携時の案内。Google と Outlook の両方のボタンを並べる。
- * 両方とも未連携のときに全画面表示される。
+ * 未連携時の案内。Google / Outlook / Apple Calendar の 3 つのボタンを並べる。
+ * Apple ボタンを押すと OAuth ではなく専用モーダルが開く (親で制御)。
  */
 export function ConnectPrompt({ onConnect, busy, errors, configMissing }: Props) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-4 p-8 text-center">
       <h2 className="text-base font-semibold text-gray-800">カレンダーと連携</h2>
       <p className="max-w-xs text-xs leading-5 text-gray-500">
-        Google または Outlook の予定を読み取って空き枠の選択に使います。<br />
-        読み取り専用で予定の作成・変更はしません。両方繋ぐと予定を合算表示します。
+        Google / Outlook / Apple Calendar の予定を読み取って空き枠の選択に使います。<br />
+        読み取り専用で予定の作成・変更はしません。複数繋ぐと合算表示します。
       </p>
 
       <div className="flex w-full max-w-xs flex-col gap-2">
         <ConnectButton
-          provider="google"
           label="Google と連携する"
           busy={busy === "google"}
           disabled={configMissing.google}
@@ -35,14 +34,11 @@ export function ConnectPrompt({ onConnect, busy, errors, configMissing }: Props)
           tone="brand"
         />
         {configMissing.google && (
-          <p className="text-xs text-red-600">
-            VITE_GOOGLE_CLIENT_ID が未設定です。
-          </p>
+          <p className="text-xs text-red-600">VITE_GOOGLE_CLIENT_ID が未設定です。</p>
         )}
         {errors.google && <p className="text-xs text-red-600">{errors.google}</p>}
 
         <ConnectButton
-          provider="microsoft"
           label="Outlook と連携する"
           busy={busy === "microsoft"}
           disabled={configMissing.microsoft}
@@ -50,28 +46,38 @@ export function ConnectPrompt({ onConnect, busy, errors, configMissing }: Props)
           tone="microsoft"
         />
         {configMissing.microsoft && (
-          <p className="text-xs text-red-600">
-            VITE_MICROSOFT_CLIENT_ID が未設定です。
-          </p>
+          <p className="text-xs text-red-600">VITE_MICROSOFT_CLIENT_ID が未設定です。</p>
         )}
-        {errors.microsoft && <p className="text-xs text-red-600">{errors.microsoft}</p>}
+        {errors.microsoft && (
+          <p className="text-xs text-red-600">{errors.microsoft}</p>
+        )}
+
+        <ConnectButton
+          label="Apple Calendar と連携する"
+          busy={busy === "apple"}
+          disabled={false}
+          onClick={() => onConnect("apple")}
+          tone="apple"
+        />
+        {errors.apple && <p className="text-xs text-red-600">{errors.apple}</p>}
       </div>
     </div>
   );
 }
 
 function ConnectButton(props: {
-  provider: ProviderId;
   label: string;
   busy: boolean;
   disabled: boolean;
-  tone: "brand" | "microsoft";
+  tone: "brand" | "microsoft" | "apple";
   onClick: () => void;
 }) {
   const tone =
     props.tone === "microsoft"
       ? "bg-sky-600 text-white hover:bg-sky-700"
-      : "bg-brand text-white";
+      : props.tone === "apple"
+        ? "bg-pink-600 text-white hover:bg-pink-700"
+        : "bg-brand text-white";
   return (
     <button
       type="button"

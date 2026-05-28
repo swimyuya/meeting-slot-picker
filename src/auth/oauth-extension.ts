@@ -20,7 +20,11 @@ import {
 } from "../lib/secrets";
 import { emailFromIdToken } from "./identity";
 import { buildAuthUrl, generatePkce, generateState } from "./oauth";
-import { getProviderSpec, type ProviderId } from "./providers";
+import {
+  getOAuthProviderSpec,
+  getProviderSpec,
+  type OAuthProviderId,
+} from "./providers";
 
 interface ChromeIdentityLike {
   identity: {
@@ -50,7 +54,7 @@ export interface ExtensionSignInDeps {
  * Chrome 拡張機能で OAuth フローを実行し、refresh_token を chrome.storage に保存する。
  */
 export async function signInExtension(
-  provider: ProviderId,
+  provider: OAuthProviderId,
   config: ExtensionSignInConfig,
   deps: ExtensionSignInDeps = {},
 ): Promise<void> {
@@ -62,7 +66,7 @@ export async function signInExtension(
   const fetchFn = deps.fetchFn ?? fetch;
   const identity = getChromeIdentity();
   const redirectUri = identity.identity.getRedirectURL();
-  const spec = getProviderSpec(provider);
+  const spec = getOAuthProviderSpec(provider);
 
   const { verifier, challenge } = await generatePkce();
   const state = generateState();

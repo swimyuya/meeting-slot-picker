@@ -114,11 +114,16 @@ export function WeekGrid({ columns, events, selection, onCellDown, onCellEnter }
                 const leftPct = (layout.lane / layout.laneCount) * 100;
                 const startStr = toHHMM(new Date(layout.event.start));
                 const endStr = toHHMM(new Date(layout.event.end));
-                const isMs = layout.event.source === "microsoft";
-                const colorCls = isMs
-                  ? "border-sky-400/40 bg-sky-200/55"
-                  : "border-gray-400/40 bg-gray-300/55";
-                const titleText = `${startStr}-${endStr} ${isMs ? "Outlook: " : ""}${layout.event.summary}`;
+                const src = layout.event.source;
+                const colorCls =
+                  src === "microsoft"
+                    ? "border-sky-400/40 bg-sky-200/55"
+                    : src === "apple"
+                      ? "border-pink-400/40 bg-pink-200/55"
+                      : "border-gray-400/40 bg-gray-300/55";
+                const prefix =
+                  src === "microsoft" ? "Outlook: " : src === "apple" ? "Apple: " : "";
+                const titleText = `${startStr}-${endStr} ${prefix}${layout.event.summary}`;
                 return (
                   <div
                     key={layout.event.id}

@@ -12,7 +12,10 @@
  * が含まれていたら secrets に上書き保存する。
  */
 
-import { getProviderSpec, type ProviderId } from "../auth/providers";
+import {
+  getOAuthProviderSpec,
+  type OAuthProviderId,
+} from "../auth/providers";
 import { getApiBaseUrl } from "../lib/env";
 import { httpFetch, safeErrorBody, type HttpFetch } from "../lib/http";
 import { setRefreshToken } from "../lib/secrets";
@@ -47,12 +50,12 @@ export function clearTokenCache(): void {
   inflight.clear();
 }
 
-function cacheKey(provider: ProviderId, refreshToken: string): string {
+function cacheKey(provider: OAuthProviderId, refreshToken: string): string {
   return `${provider}:${refreshToken}`;
 }
 
 export async function getAccessToken(
-  provider: ProviderId,
+  provider: OAuthProviderId,
   input: TokenInput,
   deps: TokenDeps = {},
 ): Promise<string> {
@@ -76,7 +79,7 @@ export async function getAccessToken(
 }
 
 async function requestToken(
-  provider: ProviderId,
+  provider: OAuthProviderId,
   input: TokenInput,
   deps: TokenDeps,
 ): Promise<string> {
@@ -112,7 +115,7 @@ async function requestToken(
   }
 
   // Tauri: provider の token endpoint に直接 POST (Desktop client は client_secret 同梱)
-  const spec = getProviderSpec(provider);
+  const spec = getOAuthProviderSpec(provider);
   const body = new URLSearchParams({
     client_id: input.clientId,
     refresh_token: input.refreshToken,

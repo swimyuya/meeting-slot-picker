@@ -14,6 +14,7 @@
 import type { ProviderOAuthSpec } from "./types";
 
 export const MICROSOFT_SPEC: ProviderOAuthSpec = {
+  kind: "oauth-pkce",
   authEndpoint: "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
   tokenEndpoint: "https://login.microsoftonline.com/common/oauth2/v2.0/token",
   defaultScope:

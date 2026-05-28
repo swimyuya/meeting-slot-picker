@@ -4,15 +4,18 @@
 
 import type { ProviderId } from "../../auth/providers";
 import type { HttpFetch } from "../../lib/http";
+import { getAppleCredentials } from "../../lib/secrets";
 import type { TokenInput } from "../token";
 import type { CalendarEvent } from "../types";
+import { fetchAppleEvents } from "./apple";
 import { fetchGoogleEvents } from "./google";
 import { fetchMicrosoftEvents } from "./microsoft";
 
 export interface FetchEventsInput {
   provider: ProviderId;
+  /** OAuth provider 用認証情報 (Apple では未使用)。 */
   auth: TokenInput;
-  /** Google 用カレンダー ID (microsoft では無視)。 */
+  /** Google 用カレンダー ID (microsoft / apple では無視)。 */
   calendarId?: string;
   timeMin: Date;
   timeMax: Date;
@@ -27,6 +30,14 @@ export async function fetchEventsForProvider(
   input: FetchEventsInput,
   deps: FetchEventsDeps = {},
 ): Promise<CalendarEvent[]> {
+  if (input.provider === "apple") {
+    const credentials = await getAppleCredentials();
+    if (!credentials) return [];
+    return fetchAppleEvents(
+      { credentials, timeMin: input.timeMin, timeMax: input.timeMax },
+      { fetchFn: deps.fetchFn },
+    );
+  }
   if (input.provider === "microsoft") {
     return fetchMicrosoftEvents(
       { auth: input.auth, timeMin: input.timeMin, timeMax: input.timeMax },
@@ -44,5 +55,6 @@ export async function fetchEventsForProvider(
   );
 }
 
+export { fetchAppleEvents } from "./apple";
 export { fetchGoogleEvents } from "./google";
 export { fetchMicrosoftEvents } from "./microsoft";

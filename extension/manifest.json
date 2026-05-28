@@ -4,7 +4,6 @@
   "short_name": "日程ピッカー Pro",
   "version": "0.1.0",
   "description": "Google + Outlook の予定を重ねて空き時間を選び、クリップボードにコピーするツール。日程調整提案にそのまま貼り付け可能。",
-  "default_locale": "ja",
   "minimum_chrome_version": "100",
   "permissions": ["storage", "identity"],
   "host_permissions": [

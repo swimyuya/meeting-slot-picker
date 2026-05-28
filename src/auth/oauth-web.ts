@@ -24,7 +24,11 @@ import {
 } from "../lib/secrets";
 import { emailFromIdToken } from "./identity";
 import { buildAuthUrl, generatePkce, generateState } from "./oauth";
-import { getProviderSpec, type ProviderId } from "./providers";
+import {
+  getOAuthProviderSpec,
+  getProviderSpec,
+  type OAuthProviderId,
+} from "./providers";
 
 const VERIFIER_KEY = "msp:oauth:verifier";
 const STATE_KEY = "msp:oauth:state";
@@ -42,7 +46,7 @@ export interface WebSignInConfig {
  * この関数は通常 return しない (location.href で遷移)。
  */
 export async function signInWeb(
-  provider: ProviderId,
+  provider: OAuthProviderId,
   config: WebSignInConfig,
 ): Promise<never> {
   if (!config.clientId) {
@@ -53,7 +57,7 @@ export async function signInWeb(
   if (!config.redirectUri) {
     throw new Error("redirect_uri が空です。");
   }
-  const spec = getProviderSpec(provider);
+  const spec = getOAuthProviderSpec(provider);
   const { verifier, challenge } = await generatePkce();
   const state = generateState();
   sessionStorage.setItem(VERIFIER_KEY, verifier);
@@ -103,7 +107,7 @@ export async function handleAuthCallback(
   if (providerRaw !== "google" && providerRaw !== "microsoft") {
     throw new Error("セッションが破損しています。もう一度連携をやり直してください。");
   }
-  const provider: ProviderId = providerRaw;
+  const provider: OAuthProviderId = providerRaw;
   if (state !== expectedState) {
     throw new Error("state が一致しません (CSRF の可能性があります)。");
   }

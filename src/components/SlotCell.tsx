@@ -105,7 +105,12 @@ function isTouchLike(pointerType: string): boolean {
 }
 
 function formatEventLine(ev: CalendarEvent): string {
-  const prefix = ev.source === "microsoft" ? "Outlook: " : "";
+  const prefix =
+    ev.source === "microsoft"
+      ? "Outlook: "
+      : ev.source === "apple"
+        ? "Apple: "
+        : "";
   if (ev.allDay) return `終日 ${prefix}${ev.summary}`;
   const startD = new Date(ev.start);
   const endD = new Date(ev.end);

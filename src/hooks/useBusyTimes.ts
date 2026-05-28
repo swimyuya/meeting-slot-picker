@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import type { ProviderId } from "../auth/providers";
+import { isOAuthProvider, type ProviderId } from "../auth/providers";
 import { fetchEventsForProvider } from "../calendar/providers";
 import type { CalendarEvent } from "../calendar/types";
 import type { AppConfig } from "../lib/config";
@@ -10,13 +10,14 @@ import {
   MICROSOFT_CLIENT_SECRET,
 } from "../lib/env";
 import { errMessage } from "../lib/error";
-import { getRefreshToken } from "../lib/secrets";
+import { getAppleCredentials, getRefreshToken } from "../lib/secrets";
 import { DAY_MS, startOfJstDay } from "../lib/time";
 import type { ConnectedState, ProviderError } from "./useProviderStatus";
 
 /**
  * 接続中の provider 全てに対し、表示範囲の予定を並列 fetch して merge するフック。
  * 片方が失敗してももう一方は表示する。エラーは provider 別に保持。
+ * Apple は CalDAV (Vercel Function) 経由で取得する。
  */
 export function useBusyTimes(connected: ConnectedState, config: AppConfig, now: Date) {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
@@ -28,6 +29,7 @@ export function useBusyTimes(connected: ConnectedState, config: AppConfig, now: 
     const targets: ProviderId[] = [];
     if (connected.google === true) targets.push("google");
     if (connected.microsoft === true) targets.push("microsoft");
+    if (connected.apple === true) targets.push("apple");
 
     if (targets.length === 0) {
       setEvents([]);
@@ -41,6 +43,22 @@ export function useBusyTimes(connected: ConnectedState, config: AppConfig, now: 
     const timeMax = new Date(timeMin.getTime() + daysAhead * DAY_MS);
 
     const tasks = targets.map(async (provider) => {
+      if (provider === "apple") {
+        // Apple: credentials を取得して dispatch (auth 不要、providers/apple.ts が
+        // /api/calendar/apple/events を呼ぶ)
+        const creds = await getAppleCredentials();
+        if (!creds) return { provider, events: [] as CalendarEvent[] };
+        const fetched = await fetchEventsForProvider({
+          provider,
+          // OAuth 経路では使わないが型の都合上ダミーを渡す
+          auth: { clientId: "", refreshToken: "" },
+          timeMin,
+          timeMax,
+        });
+        return { provider, events: fetched };
+      }
+      // OAuth provider (Google / Microsoft)
+      if (!isOAuthProvider(provider)) return { provider, events: [] as CalendarEvent[] };
       const refreshToken = await getRefreshToken(provider);
       if (!refreshToken) return { provider, events: [] as CalendarEvent[] };
       const clientId = provider === "google" ? GOOGLE_CLIENT_ID : MICROSOFT_CLIENT_ID;
@@ -71,7 +89,14 @@ export function useBusyTimes(connected: ConnectedState, config: AppConfig, now: 
     setEvents(merged);
     setErrors(errs);
     setLoading(false);
-  }, [connected.google, connected.microsoft, daysAhead, calendarId, now]);
+  }, [
+    connected.google,
+    connected.microsoft,
+    connected.apple,
+    daysAhead,
+    calendarId,
+    now,
+  ]);
 
   useEffect(() => {
     void reload();

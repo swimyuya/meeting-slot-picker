@@ -24,7 +24,12 @@ import {
 } from "../lib/secrets";
 import { isExtension, isTauri } from "../lib/tauri";
 import { emailFromIdToken } from "./identity";
-import { getProviderSpec, type ProviderId, type ProviderOAuthSpec } from "./providers";
+import {
+  getOAuthProviderSpec,
+  getProviderSpec,
+  type OAuthProviderId,
+  type ProviderOAuthSpec,
+} from "./providers";
 
 const DEFAULT_TIMEOUT_SECS = 180;
 
@@ -93,7 +98,7 @@ export function buildAuthUrlLegacyGoogle(params: {
   challenge: string;
   state: string;
 }): string {
-  return buildAuthUrl(getProviderSpec("google"), params);
+  return buildAuthUrl(getOAuthProviderSpec("google"), params);
 }
 
 /** authorization code を token endpoint で交換し refresh_token を得る。 */
@@ -150,7 +155,7 @@ export async function exchangeCode(
  *   - Tauri          → loopback で完結 (本関数内)
  */
 export async function connect(
-  provider: ProviderId,
+  provider: OAuthProviderId,
   config: OAuthConfig,
   deps: OAuthDeps = {},
 ): Promise<void> {
@@ -159,7 +164,7 @@ export async function connect(
       `${getProviderSpec(provider).displayName}: client_id が未設定です (.env.local を確認してください)。`,
     );
   }
-  const spec = getProviderSpec(provider);
+  const spec = getOAuthProviderSpec(provider);
 
   // テスト時は deps.captureCode が指定されるので、その場合は Tauri 経路に流す。
   if (!deps.captureCode) {
@@ -237,7 +242,7 @@ async function defaultCaptureCode(
  * 失敗しても OAuth 自体は成功扱いにする (cosmetic な情報なので)。
  */
 export async function persistIdentityIfPossible(
-  provider: ProviderId,
+  provider: OAuthProviderId,
   idToken: string | undefined,
 ): Promise<void> {
   try {
@@ -267,4 +272,4 @@ export function base64UrlEncode(buffer: ArrayBuffer): string {
 
 // 旧コードが import する DEFAULT_SCOPE は Google 用と意味づけて re-export しておく
 // (後方互換: 削除前提)。
-export const DEFAULT_SCOPE = getProviderSpec("google").defaultScope;
+export const DEFAULT_SCOPE = getOAuthProviderSpec("google").defaultScope;

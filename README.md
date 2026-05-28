@@ -1,10 +1,10 @@
 # 日程ピッカー Pro (Meeting Slot Picker Pro)
 
-> **Google + Outlook 対応版** — 既存「日程ピッカー」(Google のみ) は別 repo / 別配布で並行運用中。**Pro 版 (Outlook 連携あり) はこちら**。
+> **Google + Outlook + Apple Calendar 対応版** — 既存「日程ピッカー」(Google のみ) は別 repo / 別配布で並行運用中。**Pro 版はこちら**。
 >
 > 🎁 **Free Pro Beta** — 全機能ご利用いただけます。将来サブスク化予定 ([roadmap](docs/subscription-roadmap.md))。
 
-`Ctrl+Shift+U` でどこからでも開けるメニューバー常駐アプリ + **iPhone / iPad の PWA** + **Chrome 拡張機能**。Google カレンダーと Outlook の予定を重ねた週グリッドで空き枠（30分単位）を選ぶと、日程調整用のテキストがクリップボードに入る。
+`Ctrl+Shift+U` でどこからでも開けるメニューバー常駐アプリ + **iPhone / iPad の PWA** + **Chrome 拡張機能**。Google カレンダーと Outlook と Apple Calendar の予定を重ねた週グリッドで空き枠（30分単位）を選ぶと、日程調整用のテキストがクリップボードに入る。
 
 ```
 5/23（水）10:00-11:00 / 13:00-13:30
@@ -17,7 +17,9 @@
 
 - **グローバルショートカット**（既定 `Ctrl+Shift+U`、設定で変更可）でポップアップをトグル
 - **メニューバー常駐**（Dock アイコンなし、トレイクリックでも開閉可）
-- **Google カレンダー + Outlook 連携** — 両方同時に繋いで予定を合算表示 (薄いグレー=Google / 薄い水色=Outlook)。読み取り専用
+- **3 つのカレンダー連携** — Google + Outlook + Apple Calendar (iCloud) を同時に繋いで予定を合算表示
+  - 薄いグレー = Google / 薄い水色 = Outlook / 薄いピンク = Apple
+  - すべて読み取り専用。Apple は [アプリ用パスワード手順](docs/apple-calendar-setup.md) 参照
 - **重なる予定もすべて表示** — カレンダー風の縦バーで時間幅が一目で分かる、終日予定は終日ストリップに名前付きで表示
 - **クリック／ドラッグで複数選択** — 連続枠は自動結合、日付ごとに集約してコピー
 - refresh_token は **OS キーチェーン** に保存（設定ファイルには秘密情報を置かない）

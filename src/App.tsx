@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PROVIDER_IDS, type ProviderId } from "./auth/providers";
+import { AppleConnectModal } from "./components/AppleConnectModal";
 import { ConnectPrompt } from "./components/ConnectPrompt";
 import { MobileDayView } from "./components/MobileDayView";
 import { SettingsPanel } from "./components/SettingsPanel";
@@ -44,6 +45,7 @@ function MainApp() {
   useShortcut(config.shortcut);
   const updater = useUpdater();
   const [showSettings, setShowSettings] = useState(false);
+  const [showAppleModal, setShowAppleModal] = useState(false);
   // モバイル幅では1日スワイプビュー、PCではカレンダー風週グリッドに切り替え。
   const isMobile = useMediaQuery("(max-width: 768px)");
 
@@ -105,7 +107,12 @@ function MainApp() {
   }, []);
 
   const configMissing = useMemo<Record<ProviderId, boolean>>(
-    () => ({ google: !isGoogleConfigured(), microsoft: !isMicrosoftConfigured() }),
+    () => ({
+      google: !isGoogleConfigured(),
+      microsoft: !isMicrosoftConfigured(),
+      // Apple は環境変数不要 (ユーザーが連携時にアプリ用パスワードを入力)
+      apple: false,
+    }),
     [],
   );
 
@@ -114,14 +121,25 @@ function MainApp() {
   const showLoading = !loaded || !providerStatus.allKnown;
 
   // 表示用の合計 busy 数とエラー文字列 (複数 provider のうち最初のエラーを表示)
+  const providerLabel = (p: ProviderId): string =>
+    p === "microsoft" ? "Outlook" : p === "apple" ? "Apple" : "Google";
   const aggregatedBusyError = useMemo(() => {
     const e: string[] = [];
     for (const p of PROVIDER_IDS) {
       const msg = busyErrors[p];
-      if (msg) e.push(`${p === "microsoft" ? "Outlook" : "Google"}: ${msg}`);
+      if (msg) e.push(`${providerLabel(p)}: ${msg}`);
     }
     return e.length > 0 ? e.join(" / ") : null;
   }, [busyErrors]);
+
+  /** Connect ハンドラ。Apple はモーダル経路、それ以外は通常の OAuth 経路。 */
+  const handleConnect = (p: ProviderId) => {
+    if (p === "apple") {
+      setShowAppleModal(true);
+      return;
+    }
+    void providerStatus.connect(p);
+  };
 
   return (
     <div className="flex h-full flex-col">
@@ -158,7 +176,7 @@ function MainApp() {
         </div>
       ) : showConnectPrompt ? (
         <ConnectPrompt
-          onConnect={(p) => void providerStatus.connect(p)}
+          onConnect={handleConnect}
           busy={providerStatus.busy}
           errors={providerStatus.error}
           configMissing={configMissing}
@@ -170,6 +188,7 @@ function MainApp() {
           onClose={() => setShowSettings(false)}
           providerStatus={providerStatus}
           configMissing={configMissing}
+          onOpenAppleModal={() => setShowAppleModal(true)}
         />
       ) : (
         <>
@@ -203,6 +222,13 @@ function MainApp() {
             onDisconnect={() => void providerStatus.disconnect("google")}
           />
         </>
+      )}
+
+      {showAppleModal && (
+        <AppleConnectModal
+          onClose={() => setShowAppleModal(false)}
+          onSuccess={() => void providerStatus.refreshConnected()}
+        />
       )}
     </div>
   );

@@ -6,12 +6,15 @@
  *   - Chrome 拡張機能: chrome.storage.local (storage-extension)。
  *   - Web (PWA / ブラウザ): IndexedDB (storage-web)。
  *
- * Provider-aware: Pro 版では Google / Microsoft の refresh_token を別キーで保持する。
+ * Provider-aware:
+ *   - Google / Microsoft は refresh_token を別キーで保持 (OAuth)
+ *   - Apple は email + アプリ用パスワードを別キーで保持 (CalDAV)
+ *
  * 既存「日程ピッカー」(Google 専用) と同じ google_refresh_token キーを使うため、
  * 既存 Pro 内 Google 連携 user の Google token はそのまま読める (マイグレーション不要)。
  */
 
-import type { ProviderId } from "../auth/providers";
+import type { OAuthProviderId } from "../auth/providers";
 import {
   deleteSecretExtension,
   getSecretExtension,
@@ -20,14 +23,18 @@ import {
 import { deleteSecretWeb, getSecretWeb, setSecretWeb } from "./storage-web";
 import { isExtension, isTauri } from "./tauri";
 
-/** refresh_token を保存するキー (provider 別)。 */
-export const REFRESH_TOKEN_KEYS: Readonly<Record<ProviderId, string>> = {
+/** refresh_token を保存するキー (OAuth provider 別)。 */
+export const REFRESH_TOKEN_KEYS: Readonly<Record<OAuthProviderId, string>> = {
   google: "google_refresh_token",
   microsoft: "microsoft_refresh_token",
 } as const;
 
 /** 後方互換用 (旧 Google 専用版で使われていた定数)。 */
 export const REFRESH_TOKEN_KEY = REFRESH_TOKEN_KEYS.google;
+
+/** Apple CalDAV の認証情報キー。 */
+const APPLE_EMAIL_KEY = "apple_email";
+const APPLE_APP_PASSWORD_KEY = "apple_app_password";
 
 /** サブスク将来化用 identity キー。Pro Beta 中は表示にも使わず、storage に置くだけ。 */
 const USER_EMAIL_KEY = "pro:user_email";
@@ -63,21 +70,45 @@ export async function deleteSecret(key: string): Promise<void> {
   return deleteSecretWeb(key);
 }
 
-// ---- refresh_token (provider-aware) ----
+// ---- refresh_token (OAuth provider 別) ----
 
-export const getRefreshToken = (provider: ProviderId): Promise<string | null> =>
+export const getRefreshToken = (provider: OAuthProviderId): Promise<string | null> =>
   getSecret(REFRESH_TOKEN_KEYS[provider]);
-export const setRefreshToken = (provider: ProviderId, value: string): Promise<void> =>
+export const setRefreshToken = (provider: OAuthProviderId, value: string): Promise<void> =>
   setSecret(REFRESH_TOKEN_KEYS[provider], value);
-export const deleteRefreshToken = (provider: ProviderId): Promise<void> =>
+export const deleteRefreshToken = (provider: OAuthProviderId): Promise<void> =>
   deleteSecret(REFRESH_TOKEN_KEYS[provider]);
+
+// ---- Apple CalDAV 認証情報 ----
+
+export interface AppleCredentials {
+  email: string;
+  password: string;
+}
+
+export async function setAppleCredentials(creds: AppleCredentials): Promise<void> {
+  await setSecret(APPLE_EMAIL_KEY, creds.email);
+  await setSecret(APPLE_APP_PASSWORD_KEY, creds.password);
+}
+
+export async function getAppleCredentials(): Promise<AppleCredentials | null> {
+  const email = await getSecret(APPLE_EMAIL_KEY);
+  const password = await getSecret(APPLE_APP_PASSWORD_KEY);
+  if (!email || !password) return null;
+  return { email, password };
+}
+
+export async function deleteAppleCredentials(): Promise<void> {
+  await deleteSecret(APPLE_EMAIL_KEY);
+  await deleteSecret(APPLE_APP_PASSWORD_KEY);
+}
 
 // ---- 識別 (将来のサブスク用、enforcement なし) ----
 
 export const setUserEmail = (email: string): Promise<void> => setSecret(USER_EMAIL_KEY, email);
 export const getUserEmail = (): Promise<string | null> => getSecret(USER_EMAIL_KEY);
 
-export const setProviderForIdentity = (provider: ProviderId): Promise<void> =>
+export const setProviderForIdentity = (provider: OAuthProviderId): Promise<void> =>
   setSecret(PROVIDER_FOR_IDENTITY_KEY, provider);
 export const getProviderForIdentity = (): Promise<string | null> =>
   getSecret(PROVIDER_FOR_IDENTITY_KEY);
