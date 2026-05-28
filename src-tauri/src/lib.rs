@@ -9,8 +9,6 @@ use tauri::{
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     Manager,
 };
-use tauri_plugin_global_shortcut::ShortcutState;
-
 /// メインウィンドウのラベル (tauri.conf.json と一致させる).
 const MAIN_WINDOW: &str = "main";
 
@@ -21,22 +19,13 @@ pub fn run() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
-        .plugin(
-            // 登録自体は JS 側 useShortcut が config.shortcut に従って行う。
-            // どのショートカットが押されてもこの単一ハンドラがトグルを実行する。
-            tauri_plugin_global_shortcut::Builder::new()
-                .with_handler(|app, _shortcut, event| {
-                    if event.state() == ShortcutState::Pressed {
-                        toggle_popup(app);
-                    }
-                })
-                .build(),
-        )
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             commands::secret_set,
             commands::secret_get,
             commands::secret_delete,
-            commands::oauth_capture_code
+            commands::oauth_capture_code,
+            toggle_window
         ])
         .setup(|app| {
             // Dock アイコンを隠してメニューバー常駐にする (macOS のみ).
@@ -67,6 +56,12 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+/// JS 側 (useShortcut の handler や任意の UI ボタン) から呼べる toggle コマンド。
+#[tauri::command]
+fn toggle_window(app: tauri::AppHandle) {
+    toggle_popup(&app);
 }
 
 /// メインウィンドウの表示/非表示をトグルする.
