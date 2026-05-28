@@ -49,5 +49,47 @@ jobs:
           releaseName: ${{ github.ref_name }}
           releaseDraft: false
           prerelease: false
-          # latest.json (自動アップデータが読むメタ) も Release Assets に含める
-          includeUpdaterJson: true
+          # tauri-action の includeUpdaterJson は universal ターゲットで .sig 認識に
+          # 失敗するため使わず、次のステップで自前生成・アップロードする。
+          includeUpdaterJson: false
+
+      # tauri-action は universal ターゲットだと latest.json/.sig をアップロードしない
+      # ので、ビルド成果物の .app.tar.gz を再署名して latest.json と共にアップロード。
+      - name: Sign updater artifact & upload latest.json
+        if: success()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          set -e
+          BUILD_DIR="src-tauri/target/universal-apple-darwin/release/bundle/macos"
+          TAR_FILE=$(ls "$BUILD_DIR"/*.app.tar.gz 2>/dev/null | head -1)
+          if [ -z "$TAR_FILE" ]; then
+            echo "No .app.tar.gz produced — skipping updater metadata"
+            exit 0
+          fi
+          npm run tauri -- signer sign "$TAR_FILE"
+          SIG_FILE="${TAR_FILE}.sig"
+          TAR_NAME=$(gh release view "$TAG" --json assets -q '.assets[] | select(.name | endswith(".app.tar.gz")) | .name')
+          URL="https://github.com/$REPO/releases/download/$TAG/$TAR_NAME"
+          SIG_UPLOAD_NAME="${TAR_NAME}.sig"
+          cp "$SIG_FILE" "$SIG_UPLOAD_NAME"
+          VERSION="${TAG#v}"
+          SIG_FILE_PATH="$SIG_FILE" UPDATE_URL="$URL" UPDATE_VERSION="$VERSION" node -e "
+            const fs = require('fs');
+            const sig = fs.readFileSync(process.env.SIG_FILE_PATH, 'utf8');
+            const data = {
+              version: process.env.UPDATE_VERSION,
+              notes: 'See release notes',
+              pub_date: new Date().toISOString(),
+              platforms: {
+                'darwin-x86_64': { signature: sig, url: process.env.UPDATE_URL },
+                'darwin-aarch64': { signature: sig, url: process.env.UPDATE_URL }
+              }
+            };
+            fs.writeFileSync('latest.json', JSON.stringify(data, null, 2));
+          "
+          gh release upload "$TAG" "$SIG_UPLOAD_NAME" latest.json --clobber
