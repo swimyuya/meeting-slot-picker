@@ -22,12 +22,13 @@ import manifest from "./extension/manifest.json" with { type: "json" };
  */
 export default defineConfig({
   plugins: [react(), crx({ manifest })],
+  // PWA 用の public/ アセット (manifest.webmanifest, icon-192/512.png 等) を拡張機能 ZIP に
+  // 混ぜないため、publicDir を無効化。拡張機能のアイコンは extension/icons/ に置き、
+  // @crxjs/vite-plugin が manifest 経由で自動コピーする。
+  publicDir: false,
   build: {
     outDir: "dist-extension",
     emptyOutDir: true,
-    rollupOptions: {
-      // popup の HTML 1枚で十分
-    },
   },
   envPrefix: ["VITE_"],
 });
