@@ -1,4 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+// freeBusy 経路は Tauri (Google token endpoint 直接呼び出し) を前提に検証する。
+vi.mock("../lib/tauri", () => ({ isTauri: () => true }));
+
 import { fetchBusyBetween, type FreeBusyInput } from "../calendar/freebusy";
 import { clearTokenCache } from "../calendar/token";
 

@@ -9,8 +9,8 @@ export default defineConfig({
     environment: "jsdom",
     setupFiles: ["./src/__tests__/setup.ts"],
     css: false,
-    // vitest は src 配下の単体/結合テストのみ。e2e/ は Playwright が担当。
-    include: ["src/**/*.test.{ts,tsx}"],
+    // vitest は src/ と api/ 配下の単体/結合テストを実行。e2e/ は Playwright が担当。
+    include: ["src/**/*.test.{ts,tsx}", "api/**/*.test.{ts,tsx}"],
     coverage: {
       provider: "v8",
       include: ["src/**/*.{ts,tsx}"],

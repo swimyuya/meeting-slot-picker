@@ -9,8 +9,10 @@
  * 認可 URL / token 交換は line-reply-drafter/scripts/google-auth.mjs を基にしている。
  */
 
+import { getWebRedirectUri } from "../lib/env";
 import { httpFetch, safeErrorBody, type HttpFetch } from "../lib/http";
 import { setRefreshToken } from "../lib/secrets";
+import { isTauri } from "../lib/tauri";
 
 const AUTH_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
@@ -101,11 +103,28 @@ export async function exchangeCode(
   return { refreshToken: json.refresh_token, accessToken: json.access_token ?? "" };
 }
 
-/** OAuth フロー全体を実行し、refresh_token を Keychain に保存する。 */
+/**
+ * OAuth フロー全体を実行する。
+ * - Tauri: ループバックで code 取得 → token 交換 → Keychain 保存 (この関数内で完結)
+ * - Web: signInWeb に委譲して Google 同意画面へリダイレクト (この関数は return しない)。
+ *        token 交換と refresh_token 保存は /auth/callback で実行される (handleAuthCallback)。
+ */
 export async function connectGoogle(config: OAuthConfig, deps: OAuthDeps = {}): Promise<void> {
   if (!config.clientId) {
     throw new Error("VITE_GOOGLE_CLIENT_ID が未設定です (.env.local を確認してください)。");
   }
+  // Web ランタイムでは redirect 方式に切替 (Vercel API バックエンドが token 交換を担う)。
+  // テスト時は deps.captureCode が指定されるので、その場合は Tauri 経路に流す。
+  if (!isTauri() && !deps.captureCode) {
+    const { signInWeb } = await import("./oauth-web");
+    await signInWeb({
+      clientId: config.clientId,
+      redirectUri: getWebRedirectUri(),
+      scope: config.scope,
+    });
+    return;
+  }
+
   const port = config.port ?? DEFAULT_PORT;
   const scope = config.scope ?? DEFAULT_SCOPE;
   // RFC 8252 準拠で 127.0.0.1 を使う (localhost だと IPv6 解決で取りこぼす恐れ)。

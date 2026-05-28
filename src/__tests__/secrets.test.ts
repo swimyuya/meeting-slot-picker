@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   deleteSecret,
   getRefreshToken,
@@ -7,9 +7,9 @@ import {
   setSecret,
 } from "../lib/secrets";
 
-beforeEach(() => localStorage.clear());
+// テスト間の IndexedDB クリアは setup.ts の global beforeEach に集約。
 
-describe("secrets (localStorage fallback)", () => {
+describe("secrets (IndexedDB)", () => {
   it("未保存なら null を返す", async () => {
     expect(await getSecret("k")).toBeNull();
   });

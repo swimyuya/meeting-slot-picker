@@ -5,9 +5,12 @@
  * line-reply-drafter/backend/src/services/calendar.ts の getAccessToken を移植・拡張。
  */
 
+import { getApiBaseUrl } from "../lib/env";
 import { httpFetch, safeErrorBody, type HttpFetch } from "../lib/http";
+import { isTauri } from "../lib/tauri";
 
 const TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
+const WEB_REFRESH_ENDPOINT = "/api/auth/refresh";
 const EXPIRY_MARGIN_MS = 5 * 60 * 1000;
 const DEFAULT_EXPIRES_IN_S = 3600;
 
@@ -59,6 +62,28 @@ async function requestToken(input: TokenInput, deps: TokenDeps): Promise<string>
   const fetchFn = deps.fetchFn ?? httpFetch;
   const now = deps.now ?? Date.now;
 
+  // Web (PWA): /api/auth/refresh に refresh_token のみを投げる。
+  // client_secret は Vercel サーバ env で保持しているのでブラウザに置かない。
+  if (!isTauri()) {
+    const res = await fetchFn(`${getApiBaseUrl()}${WEB_REFRESH_ENDPOINT}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refresh_token: input.refreshToken }),
+    });
+    if (!res.ok) {
+      throw new Error(`refresh failed: ${res.status} ${await safeErrorBody(res)}`);
+    }
+    const json = (await res.json()) as { access_token?: string; expires_in?: number };
+    if (!json.access_token) throw new Error("refresh: no access_token");
+    const expiresInMs = (json.expires_in ?? DEFAULT_EXPIRES_IN_S) * 1000;
+    cache.set(input.refreshToken, {
+      token: json.access_token,
+      expiresAtMs: now() + expiresInMs,
+    });
+    return json.access_token;
+  }
+
+  // Tauri (macOS): Google token endpoint に直接 POST (Desktop クライアントで client_secret を同梱)。
   const body = new URLSearchParams({
     client_id: input.clientId,
     refresh_token: input.refreshToken,

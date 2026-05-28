@@ -1,4 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+// 本テストは Tauri 経路 (Google token endpoint へ直接 POST) の振る舞いを検証する。
+// Web 経路 (/api/auth/refresh) は web-token.test.ts で別途検証する。
+vi.mock("../lib/tauri", () => ({ isTauri: () => true }));
+
 import { clearTokenCache, getAccessToken } from "../calendar/token";
 
 function jsonResponse(body: unknown, status = 200): Response {

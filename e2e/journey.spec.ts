@@ -1,20 +1,41 @@
 import { expect, test, type Page } from "@playwright/test";
 
-// secrets.ts の localStorage フォールバックキー (非 Tauri 環境)。
-const TOKEN_KEY = "meeting-slot-picker:secret:google_refresh_token";
-
-/** ページ読み込み前に refresh_token を種まきして連携済み状態にする。 */
+/**
+ * ページ読み込み前に refresh_token を IndexedDB に種まきして連携済み状態にする。
+ * Web 版は secrets を IndexedDB (DB: meeting-slot-picker, store: secrets) に保存する。
+ */
 async function seedConnected(page: Page) {
-  await page.addInitScript((key) => {
-    localStorage.setItem(key, "e2e-refresh-token");
-  }, TOKEN_KEY);
+  await page.addInitScript(() => {
+    return new Promise<void>((resolve, reject) => {
+      const open = indexedDB.open("meeting-slot-picker", 1);
+      open.onupgradeneeded = () => {
+        const db = open.result;
+        if (!db.objectStoreNames.contains("secrets")) {
+          db.createObjectStore("secrets");
+        }
+      };
+      open.onsuccess = () => {
+        const db = open.result;
+        const tx = db.transaction("secrets", "readwrite");
+        tx.objectStore("secrets").put("e2e-refresh-token", "google_refresh_token");
+        tx.oncomplete = () => {
+          db.close();
+          resolve();
+        };
+        tx.onerror = () => reject(tx.error);
+      };
+      open.onerror = () => reject(open.error);
+    });
+  });
 }
 
 test.describe("日程ピッカー 中核フロー (Web UI 層)", () => {
-  // 外部 Google への通信はテストでは遮断し、ハーメチックに保つ
-  // (.env.local の有無に依存しないようにする)。
+  // 外部 Google / Vercel API へは遮断し、ハーメチックに保つ。
   test.beforeEach(async ({ page }) => {
     await page.route(/googleapis\.com/, (route) => route.abort());
+    // /api/auth/refresh は Vercel Functions だが、E2E は localhost dev (1420) なので
+    // 実体は無い。fetch が失敗しても useBusyTimes は events=[] で表示するため UI は動く。
+    await page.route(/\/api\/auth\//, (route) => route.abort());
   });
 
   test("未連携時は連携案内 (ConnectPrompt) を表示する", async ({ page }) => {

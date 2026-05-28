@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ConnectPrompt } from "./components/ConnectPrompt";
+import { MobileDayView } from "./components/MobileDayView";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { Toolbar } from "./components/Toolbar";
 import { UpdateBanner } from "./components/UpdateBanner";
@@ -10,15 +11,25 @@ import { applyEvents, buildSlotGrid, deriveEffectiveOptions } from "./domain/slo
 import { useAuthStatus } from "./hooks/useAuthStatus";
 import { useBusyTimes } from "./hooks/useBusyTimes";
 import { useConfig } from "./hooks/useConfig";
+import { useMediaQuery } from "./hooks/useMediaQuery";
 import { useSelection } from "./hooks/useSelection";
 import { useShortcut } from "./hooks/useShortcut";
 import { useUpdater } from "./hooks/useUpdater";
 import { copyText } from "./lib/clipboard";
 import { isClientIdConfigured } from "./lib/env";
 import { isTauri } from "./lib/tauri";
+import { CallbackPage } from "./pages/CallbackPage";
 
 /** アプリのルート。連携状態に応じて連携案内 / 設定 / 週グリッドを切り替える。 */
 export function App() {
+  // OAuth コールバック専用ルート (PWA フローでのみ使用)。
+  if (typeof window !== "undefined" && window.location.pathname === "/auth/callback") {
+    return <CallbackPage />;
+  }
+  return <MainApp />;
+}
+
+function MainApp() {
   const [now, setNow] = useState(() => new Date());
   const { config, loaded, update } = useConfig();
   const { connected, busy: authBusy, error: authError, connect, disconnect } = useAuthStatus();
@@ -32,6 +43,8 @@ export function App() {
   useShortcut(config.shortcut);
   const updater = useUpdater();
   const [showSettings, setShowSettings] = useState(false);
+  // モバイル幅では1日スワイプビュー、PCではカレンダー風週グリッドに切り替え。
+  const isMobile = useMediaQuery("(max-width: 768px)");
 
   // 予定に合わせて表示範囲を自動拡張 (時間外・週末の予定も全部見えるように)。
   const effectiveOpts = useMemo(() => deriveEffectiveOptions(config, events), [config, events]);
@@ -136,13 +149,23 @@ export function App() {
         <SettingsPanel config={config} onSave={update} onClose={() => setShowSettings(false)} />
       ) : (
         <>
-          <WeekGrid
-            columns={columns}
-            events={events}
-            selection={selection}
-            onCellDown={onCellDown}
-            onCellEnter={onCellEnter}
-          />
+          {isMobile ? (
+            <MobileDayView
+              columns={columns}
+              events={events}
+              selection={selection}
+              onCellDown={onCellDown}
+              onCellEnter={onCellEnter}
+            />
+          ) : (
+            <WeekGrid
+              columns={columns}
+              events={events}
+              selection={selection}
+              onCellDown={onCellDown}
+              onCellEnter={onCellEnter}
+            />
+          )}
           <Toolbar
             preview={preview}
             count={selectedSlots.length}
