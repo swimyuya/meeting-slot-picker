@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import type { CalendarEvent } from "../calendar/types";
 import type { Slot } from "../domain/slots";
 import { toHHMM, toJstParts } from "../lib/time";
@@ -9,9 +10,21 @@ interface Props {
   onEnter: (key: string) => void;
 }
 
+// タッチで「タップか / スクロール・スワイプか」を判定する移動量しきい値 (px)
+const TAP_TOLERANCE_PX = 10;
+
 /**
  * 30分枠1セル (選択ターゲット)。予定の表示は WeekGrid 側でバーとして重ねるため、
  * このセルは選択状態の表現と、タッチ/クリックの受け口に専念する。
+ *
+ * タッチ操作の意図分離:
+ *   - touch-action: pan-y を CSS で指定 → 縦スクロールはブラウザに任せる
+ *   - pointerdown 時点では何もしない (スワイプ/スクロールの可能性があるため)
+ *   - pointermove で移動量がしきい値を超えたらタップキャンセル
+ *   - pointerup でキャンセルされていなければ選択を発火
+ * これにより上下スクロール・横スワイプ (日付遷移) で誤選択しなくなる。
+ *
+ * マウスは従来どおり pointerdown で即時選択し、pointerenter でドラッグ選択も継続。
  */
 export function SlotCell({ slot, selected, onDown, onEnter }: Props) {
   const baseClasses = "h-7 cursor-pointer border-b border-gray-100 transition-colors";
@@ -31,6 +44,10 @@ export function SlotCell({ slot, selected, onDown, onEnter }: Props) {
       : selected
         ? "選択中（クリックで解除）"
         : "クリックで選択";
+
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const tapCancelledRef = useRef(false);
+
   return (
     <div
       role="button"
@@ -39,13 +56,50 @@ export function SlotCell({ slot, selected, onDown, onEnter }: Props) {
       aria-label={ariaLabel}
       title={tooltipText}
       className={`${baseClasses} ${bgClass}`}
+      style={{ touchAction: "pan-y" }}
       onPointerDown={(e) => {
-        e.preventDefault();
-        onDown(slot.key, selected);
+        if (!isTouchLike(e.pointerType)) {
+          // デスクトップ (mouse / 未指定): 即時選択 (+ pointerenter でドラッグ選択)
+          e.preventDefault();
+          onDown(slot.key, selected);
+          return;
+        }
+        // touch / pen: 開始位置を記録、判定は pointerup まで保留
+        touchStartRef.current = { x: e.clientX, y: e.clientY };
+        tapCancelledRef.current = false;
       }}
-      onPointerEnter={() => onEnter(slot.key)}
+      onPointerMove={(e) => {
+        if (!isTouchLike(e.pointerType)) return;
+        const start = touchStartRef.current;
+        if (!start || tapCancelledRef.current) return;
+        const dx = Math.abs(e.clientX - start.x);
+        const dy = Math.abs(e.clientY - start.y);
+        if (dx > TAP_TOLERANCE_PX || dy > TAP_TOLERANCE_PX) {
+          tapCancelledRef.current = true;
+        }
+      }}
+      onPointerUp={(e) => {
+        if (!isTouchLike(e.pointerType)) return;
+        const wasTap = touchStartRef.current !== null && !tapCancelledRef.current;
+        touchStartRef.current = null;
+        if (wasTap) onDown(slot.key, selected);
+      }}
+      onPointerCancel={() => {
+        touchStartRef.current = null;
+        tapCancelledRef.current = true;
+      }}
+      onPointerEnter={(e) => {
+        // ドラッグ選択はマウスのみ。touch は pointer capture で他 cell へ enter しない。
+        if (isTouchLike(e.pointerType)) return;
+        onEnter(slot.key);
+      }}
     />
   );
+}
+
+/** タッチ系入力か。空文字 (テスト合成イベント等) はマウス扱いとして既存挙動を保つ。 */
+function isTouchLike(pointerType: string): boolean {
+  return pointerType === "touch" || pointerType === "pen";
 }
 
 function formatEventLine(ev: CalendarEvent): string {
