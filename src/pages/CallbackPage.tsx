@@ -1,17 +1,29 @@
 /**
  * /auth/callback ルートのハンドラ。
- * Google から code/state 付きで戻ってきた直後にマウントされ、
- * /api/auth/exchange に code を投げて refresh_token を取り、IndexedDB に保存して
- * ルートに遷移する。
+ * Google または Microsoft から code/state 付きで戻ってきた直後にマウントされ、
+ * /api/auth/exchange に code を投げて refresh_token を取り、保存してルートに遷移する。
  */
 
 import { useEffect, useState } from "react";
 import { handleAuthCallback } from "../auth/oauth-web";
 import { errMessage } from "../lib/error";
 
+/** sessionStorage から provider を読んで表示名を返す。 */
+function getInProgressProviderLabel(): string {
+  try {
+    const p = sessionStorage.getItem("msp:oauth:provider");
+    if (p === "microsoft") return "Outlook";
+    if (p === "google") return "Google";
+  } catch {
+    /* ignore */
+  }
+  return "カレンダー";
+}
+
 export function CallbackPage() {
   const [status, setStatus] = useState<"working" | "error">("working");
   const [error, setError] = useState<string | null>(null);
+  const [providerLabel] = useState<string>(() => getInProgressProviderLabel());
 
   useEffect(() => {
     let cancelled = false;
@@ -37,7 +49,7 @@ export function CallbackPage() {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
         <div className="h-6 w-6 animate-spin rounded-full border-2 border-gray-300 border-t-gray-700" />
-        <p className="text-sm text-gray-600">Google アカウントに連携中…</p>
+        <p className="text-sm text-gray-600">{providerLabel} アカウントに連携中…</p>
       </div>
     );
   }
