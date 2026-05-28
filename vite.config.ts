@@ -18,15 +18,29 @@ export default defineConfig({
       injectRegister: "auto",
       workbox: {
         navigateFallback: "/index.html",
-        navigateFallbackDenylist: [/^\/api\//],
+        navigateFallbackDenylist: [/^\/api\//, /^\/auth\/callback/],
         globPatterns: ["**/*.{js,css,html,png,svg,webmanifest}"],
         runtimeCaching: [
           {
-            urlPattern: /^https:\/\/(www\.googleapis\.com|oauth2\.googleapis\.com)\//,
+            // www.googleapis.com (events.list) のみキャッシュ。
+            // oauth2.googleapis.com (token endpoint) はキャッシュしない (機密 token の混入を防ぐ)。
+            urlPattern: /^https:\/\/www\.googleapis\.com\//,
             handler: "NetworkFirst",
             options: {
               cacheName: "google-api",
               expiration: { maxAgeSeconds: 300, maxEntries: 32 },
+              // 401/403 等のエラーはキャッシュしない
+              cacheableResponse: { statuses: [200] },
+            },
+          },
+          {
+            // Microsoft Graph も同様にデータ取得のみキャッシュ
+            urlPattern: /^https:\/\/graph\.microsoft\.com\//,
+            handler: "NetworkFirst",
+            options: {
+              cacheName: "ms-graph-api",
+              expiration: { maxAgeSeconds: 300, maxEntries: 32 },
+              cacheableResponse: { statuses: [200] },
             },
           },
         ],

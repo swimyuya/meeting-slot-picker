@@ -2,9 +2,17 @@
  * Chrome 拡張機能 OAuth フロー (provider 引数化版) の検証。
  */
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+// 拡張ランタイムは VITE_API_BASE_URL を必須に。テスト用に stub する。
+vi.stubEnv("VITE_API_BASE_URL", "https://example.test");
+
 import { signInExtension } from "../auth/oauth-extension";
 import { getRefreshToken } from "../lib/secrets";
+
+beforeEach(() => {
+  // env の stub は describe ごとに保持
+});
 
 const REDIRECT_URI = "https://abcdefghijklmnopabcdefghijklmnop.chromiumapp.org/";
 

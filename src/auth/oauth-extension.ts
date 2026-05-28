@@ -98,7 +98,15 @@ export async function signInExtension(
     throw new Error("state が一致しません (CSRF の可能性があります)。");
   }
 
-  const apiUrl = `${getApiBaseUrl() || "https://meeting-slot-picker-pro.vercel.app"}/api/auth/exchange`;
+  // 環境変数 VITE_API_BASE_URL から取得。Pro 拡張ビルドでは必ず設定する想定。
+  // 未設定なら明示的にエラーで知らせる (静的フォールバックで本番 URL を叩く事故を防ぐ)。
+  const apiBase = getApiBaseUrl();
+  if (!apiBase) {
+    throw new Error(
+      "VITE_API_BASE_URL が未設定です。拡張ビルド時に環境変数を設定してください。",
+    );
+  }
+  const apiUrl = `${apiBase}/api/auth/exchange`;
   const res = await fetchFn(apiUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

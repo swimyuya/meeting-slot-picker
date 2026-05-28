@@ -8,7 +8,15 @@ use std::net::{TcpListener, TcpStream};
 use std::time::{Duration, Instant};
 
 /// Keychain のサービス名 (アプリ identifier と一致させる).
-const SERVICE: &str = "com.unveil.meeting-slot-picker";
+const SERVICE: &str = "com.unveil.meeting-slot-picker-pro";
+
+/// OAuth 認可 URL として許可するホスト一覧。
+/// XSS が発生した場合に loopback コマンドへ任意 URL (file://, attacker.com 等) を
+/// 渡されるのを防ぐ多層防御。
+const ALLOWED_AUTH_HOSTS: &[&str] = &[
+    "https://accounts.google.com/",
+    "https://login.microsoftonline.com/",
+];
 
 /// 秘密情報を Keychain に保存する.
 #[tauri::command]
@@ -39,8 +47,14 @@ pub fn secret_delete(key: String) -> Result<(), String> {
     }
 }
 
-/// OAuth ループバック: 127.0.0.1:port で待ち受け、ブラウザを開き、
-/// リダイレクトの認可コードを返す。ブロッキング I/O はワーカースレッドで実行する。
+/// OAuth ループバック: 127.0.0.1:port で待ち受け、ブラウザを開き、認可コードを返す。
+///
+/// セキュリティ:
+///   - `auth_url` は許可ホストで始まる https のみ受け付ける (XSS 経由の任意 URL オープン防止)
+///   - ループバックポート競合は PKCE で実質緩和されている (攻撃者が code を取得しても
+///     code_verifier を持たないため token 交換不可)
+///
+/// ブロッキング I/O はワーカースレッドで実行する。
 #[tauri::command]
 pub async fn oauth_capture_code(
     port: u16,
@@ -48,6 +62,10 @@ pub async fn oauth_capture_code(
     expected_state: String,
     timeout_secs: u64,
 ) -> Result<String, String> {
+    // 必須: auth_url のホスト検証
+    if !ALLOWED_AUTH_HOSTS.iter().any(|h| auth_url.starts_with(h)) {
+        return Err("auth_url が許可されたエンドポイントではありません".to_string());
+    }
     tauri::async_runtime::spawn_blocking(move || {
         capture_code_blocking(port, auth_url, expected_state, timeout_secs)
     })

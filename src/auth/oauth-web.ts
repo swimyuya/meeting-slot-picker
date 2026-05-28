@@ -94,11 +94,16 @@ export async function handleAuthCallback(
   const verifier = sessionStorage.getItem(VERIFIER_KEY);
   const redirectUri = sessionStorage.getItem(REDIRECT_KEY);
   const providerRaw = sessionStorage.getItem(PROVIDER_KEY);
-  const provider = (providerRaw === "microsoft" ? "microsoft" : "google") as ProviderId;
 
   if (!expectedState || !verifier || !redirectUri) {
     throw new Error("セッションが見つかりません。もう一度連携をやり直してください。");
   }
+  // provider はホワイトリスト一致でのみ受け付ける (sessionStorage が壊れていた場合は
+  // "google" に決め打ちせず明示的にエラーにする)。
+  if (providerRaw !== "google" && providerRaw !== "microsoft") {
+    throw new Error("セッションが破損しています。もう一度連携をやり直してください。");
+  }
+  const provider: ProviderId = providerRaw;
   if (state !== expectedState) {
     throw new Error("state が一致しません (CSRF の可能性があります)。");
   }

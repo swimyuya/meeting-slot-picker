@@ -45,7 +45,11 @@ export function CallbackPage() {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center">
       <p className="text-sm font-semibold text-red-600">連携に失敗しました</p>
-      {error && <p className="break-all text-xs text-gray-600">{error}</p>}
+      {error && (
+        <p className="break-all text-xs text-gray-600">
+          {classifyError(error)}
+        </p>
+      )}
       <a
         href="/"
         className="rounded bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700"
@@ -54,4 +58,21 @@ export function CallbackPage() {
       </a>
     </div>
   );
+}
+
+/**
+ * 内部エラー文字列を user 向けの短いメッセージに変換する。
+ * - 既知のキーワード (state / 認可エラー / セッション / refresh_token) を識別して定型文を返す
+ * - それ以外は「不明なエラーが発生しました」(原文は隠す)
+ *
+ * これにより内部実装の詳細 (HTTP ステータス・error_description) を外に出さない。
+ */
+function classifyError(raw: string): string {
+  const s = raw.toLowerCase();
+  if (s.includes("state")) return "セキュリティ検証 (state) に失敗しました。もう一度やり直してください。";
+  if (s.includes("セッション")) return "セッションが見つかりませんでした。もう一度連携を始めてください。";
+  if (s.includes("access_denied") || s.includes("認可エラー")) return "Google / Outlook 側で認可が許可されませんでした。";
+  if (s.includes("refresh_token")) return "リフレッシュトークンを取得できませんでした。連携設定を解除して再試行してください。";
+  if (s.includes("/api/auth/exchange") || s.includes("exchange")) return "サーバとのトークン交換に失敗しました。時間を置いて再試行してください。";
+  return "連携に失敗しました。時間を置いて再度お試しください。";
 }

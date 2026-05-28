@@ -16,6 +16,9 @@ beforeEach(() => {
   process.env.GOOGLE_CLIENT_ID = "test-client-id";
   process.env.GOOGLE_CLIENT_SECRET = "test-client-secret";
   process.env.ALLOWED_ORIGIN = "https://meeting-slot-picker.vercel.app";
+  // 本セキュリティ修正後、redirect_uri は allowlist に登録された値のみ許可される
+  process.env.ALLOWED_REDIRECT_URIS =
+    "https://meeting-slot-picker.vercel.app/auth/callback";
 });
 
 afterEach(() => {
@@ -110,10 +113,48 @@ describe("/api/auth/exchange", () => {
       expect.objectContaining({ method: "POST" }),
     );
     expect((res as unknown as { statusCode: number }).statusCode).toBe(200);
-    expect((res as unknown as { body: unknown }).body).toEqual({
+    expect((res as unknown as { body: unknown }).body).toMatchObject({
       access_token: "at",
       refresh_token: "rt",
       expires_in: 3600,
     });
+  });
+
+  it("redirect_uri が allowlist に無いと 400 (本セキュリティ修正後)", async () => {
+    const handler = (await import("../auth/exchange")).default;
+    const req = {
+      method: "POST",
+      headers: { origin: "https://meeting-slot-picker.vercel.app" },
+      body: {
+        code: "AUTHCODE",
+        code_verifier: "a".repeat(64),
+        redirect_uri: "https://attacker.example.com/auth/callback",
+      },
+    } as unknown as VercelRequest;
+    const res = mockRes();
+    await handler(req, res);
+    expect((res as unknown as { statusCode: number }).statusCode).toBe(400);
+  });
+
+  it("Tauri ループバック http://127.0.0.1:PORT は redirect_uri として許可", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({ access_token: "at", refresh_token: "rt", expires_in: 3600 }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    const handler = (await import("../auth/exchange")).default;
+    const req = {
+      method: "POST",
+      headers: { origin: "https://meeting-slot-picker.vercel.app" },
+      body: {
+        code: "AUTHCODE",
+        code_verifier: "a".repeat(64),
+        redirect_uri: "http://127.0.0.1:4321",
+      },
+    } as unknown as VercelRequest;
+    const res = mockRes();
+    await handler(req, res);
+    expect((res as unknown as { statusCode: number }).statusCode).toBe(200);
   });
 });

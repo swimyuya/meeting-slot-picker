@@ -41,9 +41,13 @@ export interface OAuthDeps {
   captureCode?: (port: number, authUrl: string, expectedState: string) => Promise<string>;
 }
 
-/** PKCE の code_verifier と S256 code_challenge を生成する。 */
+/**
+ * PKCE の code_verifier と S256 code_challenge を生成する。
+ * RFC 7636 は 32–96 bytes を許容、推奨は 48 bytes 程度。
+ * 余裕を持たせて 48 bytes (base64url で 64 文字、384 bits エントロピー) にする。
+ */
 export async function generatePkce(): Promise<{ verifier: string; challenge: string }> {
-  const random = new Uint8Array(32);
+  const random = new Uint8Array(48);
   crypto.getRandomValues(random);
   const verifier = base64UrlEncode(random.buffer);
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier));
@@ -247,9 +251,9 @@ export async function persistIdentityIfPossible(
   }
 }
 
-/** CSRF 対策の state (ランダム 16 バイト)。 */
+/** CSRF 対策の state。256 bits (32 bytes) のランダム値で衝突・推測耐性を確保。 */
 export function generateState(): string {
-  const random = new Uint8Array(16);
+  const random = new Uint8Array(32);
   crypto.getRandomValues(random);
   return base64UrlEncode(random.buffer);
 }

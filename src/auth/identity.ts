@@ -27,11 +27,16 @@ export interface UserIdentity {
   provider: "google" | "microsoft";
 }
 
+/** id_token のサイズ上限。標準的なものは 1KB 前後、極端に大きいものは拒否してメモリを守る。 */
+const MAX_ID_TOKEN_BYTES = 8 * 1024;
+
 /** JWT を decode して email を返す。失敗時 null。 */
 export function emailFromIdToken(idToken: string | undefined): string | null {
-  if (!idToken) return null;
+  if (!idToken || idToken.length > MAX_ID_TOKEN_BYTES) return null;
   const parts = idToken.split(".");
   if (parts.length < 2) return null;
+  // payload 単独でも上限を確認 (split 後の DoS を避ける)
+  if (parts[1].length > MAX_ID_TOKEN_BYTES) return null;
   try {
     const payloadJson = base64UrlDecode(parts[1]);
     const payload = JSON.parse(payloadJson) as IdTokenPayload;

@@ -31,12 +31,12 @@ export const isMicrosoftConfigured = (): boolean => MICROSOFT_CLIENT_ID.length >
 /** 後方互換: 旧 isClientIdConfigured は Google 設定の有無を返す。 */
 export const isClientIdConfigured = (): boolean => isGoogleConfigured();
 
-/** Web ビルド用 API ベース URL。空文字 = 同一オリジン (Vercel 内 /api/* を呼ぶ既定)。 */
-const API_BASE_URL: string =
-  (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "";
-
+/**
+ * Web ビルド用 API ベース URL。空文字 = 同一オリジン (Vercel 内 /api/* を呼ぶ既定)。
+ * 実行時に評価することで vi.stubEnv によるテストでの差し替えに対応する。
+ */
 export function getApiBaseUrl(): string {
-  return API_BASE_URL;
+  return (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "";
 }
 
 /**

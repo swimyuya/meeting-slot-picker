@@ -44,8 +44,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const tokens = await refreshAccessToken({ config, refreshToken: refresh_token });
     res.status(200).json(tokens);
   } catch (e) {
-    console.error("[/api/auth/refresh]", e);
-    const message = e instanceof Error ? e.message : "internal_error";
-    res.status(500).json({ error: "refresh_failed", message });
+    // 例外オブジェクト全体ではなく message のみログに残す (機密情報の漏洩を防ぐ)。
+    console.error("[/api/auth/refresh]", e instanceof Error ? e.message : "unknown");
+    // クライアントには汎用エラーのみ返す。
+    res.status(500).json({ error: "refresh_failed" });
   }
 }
