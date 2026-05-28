@@ -1,0 +1,31 @@
+node_modules
+dist
+dist-ssr
+*.local
+
+# env
+.env
+.env.local
+.env.*.local
+
+# Tauri / Rust
+src-tauri/target
+src-tauri/gen
+
+# Playwright
+/test-results
+/playwright-report
+/playwright/.cache
+
+# tsc / vite build outputs (composite project から自動生成される .d.ts/.js)
+*.tsbuildinfo
+vite.config.d.ts
+vite.config.js
+vitest.config.d.ts
+vitest.config.js
+
+# misc
+*.log
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
