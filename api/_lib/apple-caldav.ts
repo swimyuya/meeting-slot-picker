@@ -18,14 +18,18 @@
 
 // tsdav: Vercel function は @vercel/node が CJS としてロードするため、namespace
 // import 経由でアクセスする (named import だと「export named X が無い」エラーになる)
-import * as tsdav from "tsdav";
+import * as tsdavRaw from "tsdav";
 import * as ical from "node-ical";
 
+const tsdavModule = tsdavRaw as unknown as {
+  createDAVClient: typeof import("tsdav").createDAVClient;
+  default?: { createDAVClient?: typeof import("tsdav").createDAVClient };
+};
 const createDAVClient =
-  (tsdav as { createDAVClient?: typeof tsdav.createDAVClient }).createDAVClient ??
-  ((tsdav as { default?: typeof tsdav }).default?.createDAVClient as
-    | typeof tsdav.createDAVClient
-    | undefined);
+  tsdavModule.createDAVClient ?? tsdavModule.default?.createDAVClient;
+if (!createDAVClient) {
+  throw new Error("tsdav: createDAVClient not found in module exports");
+}
 
 export interface AppleEventRaw {
   id: string;
