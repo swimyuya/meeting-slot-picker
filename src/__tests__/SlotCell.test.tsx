@@ -42,9 +42,9 @@ describe("SlotCell (デスクトップ既存挙動)", () => {
     expect(onEnter).toHaveBeenCalledWith("2026-05-28#0");
   });
 
-  it("CSS の touch-action: pan-y が設定されている (縦スクロールをブラウザ側に委ねるヒント)", () => {
+  it("CSS の touch-action: pan-y pinch-zoom が設定されている (縦スクロール + 2本指ズームをブラウザに任せる)", () => {
     render(<SlotCell slot={makeSlot()} selected={false} onDown={vi.fn()} onEnter={vi.fn()} />);
     const cell = screen.getByRole("button");
-    expect(cell.style.touchAction).toBe("pan-y");
+    expect(cell.style.touchAction).toBe("pan-y pinch-zoom");
   });
 });

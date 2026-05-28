@@ -56,7 +56,9 @@ export function SlotCell({ slot, selected, onDown, onEnter }: Props) {
       aria-label={ariaLabel}
       title={tooltipText}
       className={`${baseClasses} ${bgClass}`}
-      style={{ touchAction: "pan-y" }}
+      // pan-y で縦スクロール、pinch-zoom で 2 本指拡大縮小をブラウザに任せる。
+      // 横方向の pan は JS の useHorizontalSwipe が扱う (browser に渡さない)。
+      style={{ touchAction: "pan-y pinch-zoom" }}
       onPointerDown={(e) => {
         if (!isTouchLike(e.pointerType)) {
           // デスクトップ (mouse / 未指定): 即時選択 (+ pointerenter でドラッグ選択)
