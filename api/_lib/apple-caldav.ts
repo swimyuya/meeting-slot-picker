@@ -16,7 +16,7 @@
  *     rrule で展開しなおす
  */
 
-import { DAVClient } from "tsdav";
+import { createDAVClient } from "tsdav";
 import * as ical from "node-ical";
 
 export interface AppleEventRaw {
@@ -39,14 +39,13 @@ export interface FetchICloudEventsArgs {
 export async function fetchICloudEvents(
   args: FetchICloudEventsArgs,
 ): Promise<AppleEventRaw[]> {
-  const client = new DAVClient({
+  // tsdav v2 は createDAVClient (関数) を使う。createDAVClient 内で login も行われる
+  const client = await createDAVClient({
     serverUrl: "https://caldav.icloud.com",
     credentials: { username: args.email, password: args.appPassword },
     authMethod: "Basic",
     defaultAccountType: "caldav",
   });
-
-  await client.login();
 
   const calendars = await client.fetchCalendars();
   // VEVENT を持つカレンダーのみ (誕生日・リマインダー等は除外)
