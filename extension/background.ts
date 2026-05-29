@@ -1,21 +1,59 @@
 /**
  * Chrome 拡張機能 Service Worker (Manifest V3)。
  *
- * 最小実装: chrome.commands の `_execute_action` は Chrome が自動でポップアップを
- * 開いてくれるので、ここでハンドラを書く必要はない。
+ * 役割:
+ *   1. インストール時のログ出力 (デバッグ用)
+ *   2. **OAuth フローの実行** (popup から message を受けて launchWebAuthFlow を呼ぶ)
  *
- * 将来的に下記の用途で拡張可能:
- *   - chrome.alarms で定期的にカレンダー fetch (今回は popup 起動時のみで十分)
- *   - chrome.notifications で予定リマインダー
- *   - chrome.contextMenus でテキスト選択から日程テキスト生成
+ * なぜ background で OAuth するか:
+ *   popup から chrome.identity.launchWebAuthFlow を呼ぶと OAuth 用の別ウィンドウが
+ *   開き、その間に popup がフォーカスを失って **閉じてしまう**。popup の JS context
+ *   が死ぬと、`await launchWebAuthFlow(...)` の promise が解決しないままで token
+ *   交換が走らない。
  *
- * 何も export しない (起動時に副作用として登録するだけ)。
+ *   Service Worker は popup が閉じても生き続けるため、ここで OAuth 全体を完結させる
+ *   ことで連携を確実に成功させる。
  */
 
-// 拡張機能インストール時 / 更新時に何かやるなら下記。
+import { signInExtension } from "../src/auth/oauth-extension";
+import type { OAuthProviderId } from "../src/auth/providers";
+
+interface OAuthStartMessage {
+  type: "oauth_start";
+  provider: OAuthProviderId;
+  config: { clientId: string; scope?: string };
+}
+
 chrome.runtime.onInstalled.addListener((details) => {
   if (details.reason === "install") {
-    // 初回インストール時: なにもしないが、ログだけ残す
-    console.log("[meeting-slot-picker] installed");
+    console.log("[meeting-slot-picker-pro] installed");
   }
 });
+
+chrome.runtime.onMessage.addListener(
+  (message: unknown, _sender, sendResponse) => {
+    if (!isOAuthStartMessage(message)) return false;
+    void (async () => {
+      try {
+        await signInExtension(message.provider, message.config);
+        sendResponse({ ok: true });
+      } catch (e) {
+        sendResponse({
+          ok: false,
+          error: e instanceof Error ? e.message : "unknown error",
+        });
+      }
+    })();
+    return true; // 非同期で sendResponse するのでチャネルを保持する
+  },
+);
+
+function isOAuthStartMessage(m: unknown): m is OAuthStartMessage {
+  if (typeof m !== "object" || m === null) return false;
+  const obj = m as Record<string, unknown>;
+  if (obj.type !== "oauth_start") return false;
+  if (obj.provider !== "google" && obj.provider !== "microsoft") return false;
+  if (typeof obj.config !== "object" || obj.config === null) return false;
+  const cfg = obj.config as Record<string, unknown>;
+  return typeof cfg.clientId === "string";
+}

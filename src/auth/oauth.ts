@@ -169,8 +169,16 @@ export async function connect(
   // テスト時は deps.captureCode が指定されるので、その場合は Tauri 経路に流す。
   if (!deps.captureCode) {
     if (isExtension()) {
-      const { signInExtension } = await import("./oauth-extension");
-      await signInExtension(provider, { clientId: config.clientId, scope: config.scope });
+      // popup から OAuth を始めると launchWebAuthFlow 中に popup が閉じて promise が
+      // 死ぬため、Service Worker (background) にメッセージを送って実行を委譲する。
+      // background は popup が閉じても動き続けるのでフローが完結する。
+      const response = await sendOAuthToBackground(provider, {
+        clientId: config.clientId,
+        scope: config.scope,
+      });
+      if (!response.ok) {
+        throw new Error(response.error ?? "OAuth via background failed");
+      }
       return;
     }
     if (!isTauri()) {
@@ -254,6 +262,44 @@ export async function persistIdentityIfPossible(
   } catch {
     // 失敗は無視。connect 自体は成功させる
   }
+}
+
+/**
+ * Chrome 拡張機能: background service worker に OAuth フローを依頼する。
+ * popup が閉じても SW が完結させる。失敗時は { ok: false, error }。
+ *
+ * timeout: launchWebAuthFlow + token exchange + storage で最大 ~3 分を想定し、
+ * sendMessage 自体のレスポンスはこの間 pending する。
+ */
+async function sendOAuthToBackground(
+  provider: OAuthProviderId,
+  config: { clientId: string; scope?: string },
+): Promise<{ ok: boolean; error?: string }> {
+  // @types/chrome の宣言に頼って globalThis.chrome を扱う。
+  const c = (globalThis as { chrome?: typeof chrome }).chrome;
+  if (!c?.runtime?.sendMessage) {
+    throw new Error("chrome.runtime.sendMessage is not available");
+  }
+  const runtime = c.runtime; // narrow for TS
+  return new Promise((resolve) => {
+    runtime.sendMessage(
+      { type: "oauth_start", provider, config },
+      (response: { ok: boolean; error?: string } | undefined) => {
+        if (chrome.runtime.lastError) {
+          resolve({
+            ok: false,
+            error: chrome.runtime.lastError.message ?? "runtime error",
+          });
+          return;
+        }
+        if (!response) {
+          resolve({ ok: false, error: "no response from background" });
+          return;
+        }
+        resolve(response);
+      },
+    );
+  });
 }
 
 /** CSRF 対策の state。256 bits (32 bytes) のランダム値で衝突・推測耐性を確保。 */
