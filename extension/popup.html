@@ -5,12 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>日程ピッカー Pro</title>
     <style>
-      /* Chrome 拡張ポップアップの基本サイズ。手動でセットしないとサイズが定まらない。 */
-      html, body { width: 380px; height: 600px; margin: 0; padding: 0; }
+      /*
+       * Chrome 拡張ポップアップの基本サイズ。
+       * styles.css の `html, body, #root { height: 100% }` を !important で上書きする。
+       * 100% だと Chrome popup の viewport (content 由来) との循環参照で 0 になり、
+       * 中の flex-1 が消えてカレンダーグリッドが表示されなくなる。
+       */
+      html, body { width: 380px !important; height: 600px !important; margin: 0; padding: 0; }
+      #root { width: 380px !important; height: 600px !important; }
     </style>
+    <script type="module" src="./popup.tsx"></script>
   </head>
   <body class="bg-white text-gray-900 antialiased">
     <div id="root"></div>
-    <script type="module" src="./popup.tsx"></script>
   </body>
 </html>
