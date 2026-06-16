@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { isOAuthProvider, type ProviderId } from "../auth/providers";
 import { fetchEventsForProvider } from "../calendar/providers";
+import { isAuthExpiredError } from "../calendar/token";
 import type { CalendarEvent } from "../calendar/types";
 import type { AppConfig } from "../lib/config";
 import {
@@ -19,11 +20,22 @@ import type { ConnectedState, ProviderError } from "./useProviderStatus";
  * 片方が失敗してももう一方は表示する。エラーは provider 別に保持。
  * Apple は CalDAV (Vercel Function) 経由で取得する。
  */
-export function useBusyTimes(connected: ConnectedState, config: AppConfig, now: Date) {
+export function useBusyTimes(
+  connected: ConnectedState,
+  config: AppConfig,
+  now: Date,
+  onAuthExpired?: (provider: ProviderId) => void,
+) {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<ProviderError>({});
   const { daysAhead, calendarId } = config;
+
+  // reload を再生成せずに最新のコールバックを参照するため ref に退避する。
+  const onAuthExpiredRef = useRef(onAuthExpired);
+  useEffect(() => {
+    onAuthExpiredRef.current = onAuthExpired;
+  }, [onAuthExpired]);
 
   const reload = useCallback(async () => {
     const targets: ProviderId[] = [];
@@ -82,6 +94,10 @@ export function useBusyTimes(connected: ConnectedState, config: AppConfig, now: 
       const p = targets[i];
       if (r.status === "fulfilled") {
         merged.push(...r.value.events);
+      } else if (isAuthExpiredError(r.reason)) {
+        // refresh_token 失効: 親に通知して再連携フローへ誘導する。
+        onAuthExpiredRef.current?.(p);
+        errs[p] = "連携の有効期限が切れました。再連携してください。";
       } else {
         errs[p] = errMessage(r.reason);
       }

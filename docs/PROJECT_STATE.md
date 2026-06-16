@@ -30,6 +30,7 @@
   - 配布形態は macOS Tauri ネイティブ / iPhone・iPad PWA (https://meeting-slot-picker.vercel.app) / Chrome 拡張機能 (Manifest V3) の 3 形態。
   - OAuth 同意画面は 2026-06-11 に **本番公開済み**（機微スコープ refresh_token の 7 日失効対策、[[project-meeting-slot-picker]]）。
   - macOS 版は `/Applications` インストール + LaunchAgent（`com.unveil.meeting-slot-picker-pro`, KeepAlive）で常駐自動起動（[[project-meeting-slot-picker]]）。
+  - Google 連携失効（`invalid_grant`）時の**自動再連携**を実装（2026-06-16）: `token.ts` の `TokenRefreshError`(invalidGrant フラグ) + `isAuthExpiredError()` → `useBusyTimes` が失効検知時に `useProviderStatus.markExpired(provider)` を呼び、失効トークン破棄 + connected=false + 「要再連携」表示。Google 単独なら ConnectPrompt（ワンクリック再連携）に自動切替。本番公開（7日失効解消）の保険。vitest 198 緑 / tsc 0。**コミット済み**（`feat(auth): detect invalid_grant ...`、feature/pro、未push）（[[project-meeting-slot-picker]]）。
 - **制約・前提**:
   - 表示は **日本時間 (JST / Asia/Tokyo) 固定**、カレンダーは既定 `primary`、すべて**読み取り専用**（README）。
   - macOS 版は Apple Developer ID 未取得＝**無署名配布**、初回のみ右クリック→開くが必要（README / [[project-meeting-slot-picker]]）。
@@ -44,7 +45,8 @@
 
 - 作業ブランチ: `feature/pro`
 - 直近コミット: ab18ea2 fix(extension): popup の高さを !important で固定 (グリッド非表示問題) (2026-05-29)
-- 未コミット: 8 件 / 未push: 0 件  ← 次セッションで最初に確認
+- 直近コミット: `feat(auth): detect invalid_grant and auto-prompt reconnect`（invalid_grant 自動再連携、src 4 + test 3 + 本ファイル、2026-06-16）
+- 未コミット: 1 件（`meeting-slot-picker-pro-extension-0.1.0.zip` ＝ ビルド成果物のみ。意図的に未コミット）/ 未push: 2 件  ← 次セッションで最初に確認。push はユーザー指示待ち
 
 ## 2. これまでの大きな流れ（直近コミット）
 

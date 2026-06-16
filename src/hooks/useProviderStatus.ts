@@ -24,6 +24,10 @@ export type ProviderError = Partial<Record<ProviderId, string>>;
 
 const INITIAL: ConnectedState = { google: null, microsoft: null, apple: null };
 
+/** refresh_token 失効を検知したときに表示するメッセージ。 */
+const EXPIRED_MESSAGE =
+  "連携の有効期限が切れました。お手数ですが再連携してください。";
+
 /**
  * Provider 別の連携状態と接続/解除操作を提供するフック。
  * - 起動時に refresh_token (OAuth) / アプリ用パスワード (Apple) の有無を確認
@@ -94,6 +98,22 @@ export function useProviderStatus() {
     [refresh],
   );
 
+  /**
+   * refresh_token 失効 (invalid_grant) を検知したときの処理。
+   * 失効済みトークンを破棄して連携状態を未接続に落とし、再連携を促す
+   * メッセージをセットする。Google 単独連携なら App 側で ConnectPrompt
+   * (ワンクリック再連携) に自動で切り替わる。
+   */
+  const markExpired = useCallback(
+    async (provider: ProviderId) => {
+      if (!isOAuthProvider(provider)) return;
+      await deleteRefreshToken(provider);
+      await refresh();
+      setError((prev) => ({ ...prev, [provider]: EXPIRED_MESSAGE }));
+    },
+    [refresh],
+  );
+
   const hasAny =
     connected.google === true ||
     connected.microsoft === true ||
@@ -112,6 +132,7 @@ export function useProviderStatus() {
     error,
     connect,
     disconnect,
+    markExpired,
     hasAny,
     allKnown,
     refreshConnected,

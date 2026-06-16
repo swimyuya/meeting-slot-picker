@@ -10,7 +10,7 @@ vi.mock("../auth/oauth-web", () => ({
 }));
 
 import { useProviderStatus } from "../hooks/useProviderStatus";
-import { setRefreshToken } from "../lib/secrets";
+import { getRefreshToken, setRefreshToken } from "../lib/secrets";
 
 describe("useProviderStatus", () => {
   it("初期: 両 provider とも未連携と判定される", async () => {
@@ -49,6 +49,20 @@ describe("useProviderStatus", () => {
     });
     await waitFor(() => expect(result.current.connected.microsoft).toBe(false));
     expect(result.current.connected.google).toBe(true);
+  });
+
+  it("markExpired で refresh_token を破棄し connected=false + 要再連携エラーをセット", async () => {
+    await setRefreshToken("google", "rt");
+    const { result } = renderHook(() => useProviderStatus());
+    await waitFor(() => expect(result.current.connected.google).toBe(true));
+
+    await act(async () => {
+      await result.current.markExpired("google");
+    });
+
+    await waitFor(() => expect(result.current.connected.google).toBe(false));
+    expect(result.current.error.google).toBeTruthy();
+    expect(await getRefreshToken("google")).toBeNull();
   });
 
   it("connect 失敗時はその provider 別エラーをセットする", async () => {

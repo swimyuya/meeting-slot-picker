@@ -25,6 +25,32 @@ const WEB_REFRESH_ENDPOINT = "/api/auth/refresh";
 const EXPIRY_MARGIN_MS = 5 * 60 * 1000;
 const DEFAULT_EXPIRES_IN_S = 3600;
 
+/**
+ * refresh_token のリフレッシュに失敗したときのエラー。
+ * `invalidGrant` が true の場合は refresh_token 自体が失効しており、
+ * 再取得では復旧しない (= ユーザーの再連携が必要)。Google / Microsoft とも
+ * 失効時はレスポンス body に `error: "invalid_grant"` を返す。
+ */
+export class TokenRefreshError extends Error {
+  readonly provider: OAuthProviderId;
+  readonly status: number;
+  readonly invalidGrant: boolean;
+
+  constructor(provider: OAuthProviderId, status: number, body: string) {
+    // 既存の "refresh failed: <status> <body>" 形式を維持する。
+    super(`refresh failed: ${status} ${body}`);
+    this.name = "TokenRefreshError";
+    this.provider = provider;
+    this.status = status;
+    this.invalidGrant = body.includes("invalid_grant");
+  }
+}
+
+/** refresh_token 失効 (要再連携) によるエラーかどうかを判定する。 */
+export function isAuthExpiredError(e: unknown): e is TokenRefreshError {
+  return e instanceof TokenRefreshError && e.invalidGrant;
+}
+
 export interface TokenInput {
   clientId: string;
   clientSecret?: string;
@@ -95,7 +121,7 @@ async function requestToken(
       body: JSON.stringify({ provider, refresh_token: input.refreshToken }),
     });
     if (!res.ok) {
-      throw new Error(`refresh failed: ${res.status} ${await safeErrorBody(res)}`);
+      throw new TokenRefreshError(provider, res.status, await safeErrorBody(res));
     }
     const json = (await res.json()) as {
       access_token?: string;
@@ -129,7 +155,7 @@ async function requestToken(
     body,
   });
   if (!res.ok) {
-    throw new Error(`refresh failed: ${res.status} ${await safeErrorBody(res)}`);
+    throw new TokenRefreshError(provider, res.status, await safeErrorBody(res));
   }
   const json = (await res.json()) as {
     access_token?: string;

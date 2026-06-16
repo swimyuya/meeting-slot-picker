@@ -4,7 +4,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // Web 経路 (/api/auth/refresh) は web-token.test.ts で別途検証する。
 vi.mock("../lib/tauri", () => ({ isTauri: () => true }));
 
-import { clearTokenCache, getAccessToken } from "../calendar/token";
+import {
+  clearTokenCache,
+  getAccessToken,
+  isAuthExpiredError,
+  TokenRefreshError,
+} from "../calendar/token";
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -72,6 +77,25 @@ describe("getAccessToken (Tauri 経路、Google)", () => {
     await expect(
       getAccessToken("google", auth, { fetchFn, now: () => 0 }),
     ).rejects.toThrow(/access_token/);
+  });
+
+  it("invalid_grant の 400 は TokenRefreshError(invalidGrant=true) を throw する", async () => {
+    const fetchFn = vi.fn().mockResolvedValue(
+      jsonResponse({ error: "invalid_grant", error_description: "Token has expired" }, 400),
+    );
+    const err = await getAccessToken("google", auth, { fetchFn, now: () => 0 }).catch((e) => e);
+    expect(err).toBeInstanceOf(TokenRefreshError);
+    expect(err.invalidGrant).toBe(true);
+    expect(err.provider).toBe("google");
+    expect(isAuthExpiredError(err)).toBe(true);
+  });
+
+  it("invalid_grant 以外の 400 は invalidGrant=false (再連携扱いしない)", async () => {
+    const fetchFn = vi.fn().mockResolvedValue(new Response("upstream boom", { status: 400 }));
+    const err = await getAccessToken("google", auth, { fetchFn, now: () => 0 }).catch((e) => e);
+    expect(err).toBeInstanceOf(TokenRefreshError);
+    expect(err.invalidGrant).toBe(false);
+    expect(isAuthExpiredError(err)).toBe(false);
   });
 
   it("同時呼び出しは1回のリクエストに集約する", async () => {

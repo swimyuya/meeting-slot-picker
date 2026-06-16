@@ -39,6 +39,7 @@ function MainApp() {
     providerStatus.connected,
     config,
     now,
+    providerStatus.markExpired,
   );
   const { selection, onCellDown, onCellEnter, clearAll } = useSelection();
   // config.shortcut に従ってグローバルショートカットを動的に登録 (変更時は再登録)。
