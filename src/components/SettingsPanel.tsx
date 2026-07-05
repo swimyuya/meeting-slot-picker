@@ -1,7 +1,8 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import type { ProviderId } from "../auth/providers";
 import type { useProviderStatus } from "../hooks/useProviderStatus";
 import { AppConfigSchema, type AppConfig } from "../lib/config";
+import { ShortcutRecorder } from "./ShortcutRecorder";
 import { SubscriptionBadge } from "./SubscriptionBadge";
 
 type ProviderStatusReturn = ReturnType<typeof useProviderStatus>;
@@ -10,7 +11,7 @@ interface Props {
   config: AppConfig;
   onSave: (next: AppConfig) => Promise<void>;
   onClose: () => void;
-  /** Pro 版: provider 連携状態。後方互換のため optional。 */
+  /** Pro 版: provider 連携状態。テストの単体レンダ (連携セクション無し) 用に optional。 */
   providerStatus?: ProviderStatusReturn;
   /** Pro 版: provider 別 clientId 未設定フラグ。 */
   configMissing?: Record<ProviderId, boolean>;
@@ -233,70 +234,3 @@ function TextInput({ value, onChange }: { value: string; onChange: (v: string) =
   );
 }
 
-/** ショートカット入力: 「変更」ボタン押下で次のキー組合せを記録し Tauri spec 形式で保存。 */
-function ShortcutRecorder({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const [recording, setRecording] = useState(false);
-
-  useEffect(() => {
-    if (!recording) return;
-    const onKey = (e: KeyboardEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (e.key === "Escape") {
-        setRecording(false);
-        return;
-      }
-      // 修飾キー単独は無視 (組合せの完成を待つ)
-      if (["Control", "Meta", "Alt", "Shift", "OS"].includes(e.key)) return;
-      const parts: string[] = [];
-      if (e.ctrlKey) parts.push("Control");
-      if (e.metaKey) parts.push("Cmd");
-      if (e.altKey) parts.push("Alt");
-      if (e.shiftKey) parts.push("Shift");
-      if (parts.length === 0) return; // 修飾キー無しは誤発火しやすいので拒否
-      parts.push(e.code); // 例: "KeyU" (レイアウト非依存)
-      onChange(parts.join("+"));
-      setRecording(false);
-    };
-    window.addEventListener("keydown", onKey, { capture: true });
-    return () => window.removeEventListener("keydown", onKey, { capture: true });
-  }, [recording, onChange]);
-
-  return (
-    <div className="flex items-center gap-2">
-      <code
-        aria-label="現在のショートカット"
-        className={`flex-1 rounded border px-2 py-1 ${
-          recording ? "border-brand bg-brand/5 text-brand" : "border-gray-300 bg-white text-gray-700"
-        }`}
-      >
-        {recording ? "（キー組合せを押してください・Esc で取消）" : formatShortcutForDisplay(value)}
-      </code>
-      <button
-        type="button"
-        onClick={() => setRecording((r) => !r)}
-        className="rounded border border-gray-300 px-2 py-1"
-      >
-        {recording ? "取消" : "変更"}
-      </button>
-    </div>
-  );
-}
-
-/** "Control+Shift+KeyU" 形式を表示用 "Ctrl + Shift + U" に整形。 */
-function formatShortcutForDisplay(spec: string): string {
-  if (!spec) return "(未設定)";
-  return spec
-    .split("+")
-    .map((s) => {
-      if (s === "Control" || s === "Ctrl" || s === "CmdOrControl") return "Ctrl";
-      if (s === "Cmd" || s === "Meta" || s === "Super") return "⌘";
-      if (s === "Alt" || s === "Option") return "Alt";
-      if (s === "Shift") return "Shift";
-      if (s.startsWith("Key")) return s.slice(3);
-      if (s.startsWith("Digit")) return s.slice(5);
-      if (s.startsWith("Arrow")) return s.replace("Arrow", "");
-      return s;
-    })
-    .join(" + ");
-}
