@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { CalendarEvent } from "../calendar/types";
-import { eventsForDay, layoutTimedEvents } from "../domain/dayLayout";
-import { fromJst } from "../lib/time";
+import {
+  barGeometry,
+  eventsForDay,
+  layoutTimedEvents,
+  SLOT_DURATION_MS,
+  type TimedEventLayout,
+} from "../domain/dayLayout";
+import { fromJst, MINUTE_MS, SLOT_MINUTES } from "../lib/time";
 
 function ev(over: Partial<CalendarEvent>): CalendarEvent {
   return {
@@ -56,5 +62,59 @@ describe("layoutTimedEvents", () => {
     const outside = ev({ id: "out", start: fromJst(2026, 1, 5, 10, 0).toISOString(), end: fromJst(2026, 1, 5, 11, 0).toISOString() });
     const out = layoutTimedEvents([inside, outside], dayStart, dayEnd);
     expect(out.map((l) => l.event.id)).toEqual(["in"]);
+  });
+});
+
+describe("SLOT_DURATION_MS", () => {
+  it("lib/time の SLOT_MINUTES から導出される (30分)", () => {
+    expect(SLOT_DURATION_MS).toBe(SLOT_MINUTES * MINUTE_MS);
+    expect(SLOT_DURATION_MS).toBe(30 * 60 * 1000);
+  });
+});
+
+describe("barGeometry", () => {
+  const gridStart = fromJst(2026, 1, 1, 9, 0).getTime();
+  const timeAreaHeight = 2 * 28; // 9:00-10:00 の 2 スロット
+
+  function layoutOf(startMin: number, endMin: number, lane = 0, laneCount = 1): TimedEventLayout {
+    return {
+      event: ev({}),
+      startMs: gridStart + startMin * 60_000,
+      endMs: gridStart + endMin * 60_000,
+      lane,
+      laneCount,
+    };
+  }
+
+  it("範囲内: 30分イベントは top 0 / height 28 / 全幅", () => {
+    expect(barGeometry(layoutOf(0, 30), gridStart, timeAreaHeight)).toEqual({
+      topPx: 0,
+      heightPx: 28,
+      leftPct: 0,
+      widthPct: 100,
+    });
+  });
+
+  it("グリッド開始より前に始まる予定は top 0 にクランプされる", () => {
+    const g = barGeometry(layoutOf(-30, 30), gridStart, timeAreaHeight);
+    expect(g.topPx).toBe(0);
+    expect(g.heightPx).toBe(28);
+  });
+
+  it("グリッド終了を越える予定は下端にクランプされる", () => {
+    const g = barGeometry(layoutOf(30, 120), gridStart, timeAreaHeight);
+    expect(g.topPx).toBe(28);
+    expect(g.heightPx).toBe(28); // 56 (下端) - 28
+  });
+
+  it("5分イベントは最小高 14px に切り上げる", () => {
+    const g = barGeometry(layoutOf(0, 5), gridStart, timeAreaHeight);
+    expect(g.heightPx).toBe(14);
+  });
+
+  it("2レーン目 (lane=1, laneCount=2) は left 50% / width 50%", () => {
+    const g = barGeometry(layoutOf(0, 30, 1, 2), gridStart, timeAreaHeight);
+    expect(g.leftPct).toBe(50);
+    expect(g.widthPct).toBe(50);
   });
 });

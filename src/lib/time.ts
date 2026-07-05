@@ -76,6 +76,17 @@ export function weekdayOfDayISO(dayISO: string): number {
   return toJstParts(dayISOToStart(dayISO)).weekday;
 }
 
+/** 週末 (土日) かどうか。weekday は 0=日 .. 6=土。 */
+export function isWeekend(weekday: number): boolean {
+  return weekday === 0 || weekday === 6;
+}
+
+/** "M/D（曜）" 形式の日付ラベル。例: 7/6（月）。 */
+export function formatDayLabel(dayISO: string, weekday: number): string {
+  const { month, day } = parseDayISO(dayISO);
+  return `${month}/${day}（${WEEKDAYS[weekday]}）`;
+}
+
 /** instant を JST "H:MM" にする (時は先頭ゼロなし、分は2桁)。例: 9:00, 14:30。 */
 export function toHHMM(instant: Date): string {
   const p = toJstParts(instant);

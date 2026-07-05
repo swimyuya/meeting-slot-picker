@@ -9,6 +9,7 @@ import {
   MINUTE_MS,
   SLOT_MINUTES,
   fromJst,
+  isWeekend,
   parseDayISO,
   startOfJstDay,
   toDayISO,
@@ -56,7 +57,7 @@ export function buildSlotGrid(now: Date, opts: GridOptions): DayColumn[] {
   for (let offset = 0; offset < opts.daysAhead; offset++) {
     const dayStart = new Date(todayStart + offset * DAY_MS);
     const { weekday } = toJstParts(dayStart);
-    if (opts.weekdaysOnly && (weekday === 0 || weekday === 6)) continue;
+    if (opts.weekdaysOnly && isWeekend(weekday)) continue;
     const dayISO = toDayISO(dayStart);
     columns.push({ dayISO, weekday, slots: buildDaySlots(dayISO, opts) });
   }
@@ -142,8 +143,7 @@ export function deriveEffectiveOptions(
   for (const ev of events) {
     const sParts = toJstParts(new Date(ev.start));
     const eParts = toJstParts(new Date(ev.end));
-    if (sParts.weekday === 0 || sParts.weekday === 6) weekdaysOnly = false;
-    if (eParts.weekday === 0 || eParts.weekday === 6) weekdaysOnly = false;
+    if (isWeekend(sParts.weekday) || isWeekend(eParts.weekday)) weekdaysOnly = false;
     if (ev.allDay) continue;
     if (sParts.hour < startHour) startHour = sParts.hour;
     const ceilHour = eParts.hour + (eParts.minute > 0 ? 1 : 0);

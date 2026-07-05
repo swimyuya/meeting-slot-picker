@@ -5,10 +5,17 @@
  */
 
 import type { CalendarEvent } from "../calendar/types";
-import { DAY_MS, dayISOToStart } from "../lib/time";
+import { DAY_MS, dayISOToStart, MINUTE_MS, SLOT_MINUTES } from "../lib/time";
 
-export const SLOT_HEIGHT_PX = 28; // h-7 (= 1.75rem)
-export const SLOT_DURATION_MS = 30 * 60 * 1000;
+/**
+ * 1 スロットの表示高さ。SlotCell / WeekGrid / MobileDayView の Tailwind `h-7`
+ * (= 1.75rem = 28px) と対応している — 変えるときは両方セットで変えること。
+ */
+export const SLOT_HEIGHT_PX = 28;
+/** 1 スロットの長さ。lib/time の SLOT_MINUTES が唯一の真実で、ここは導出値。 */
+export const SLOT_DURATION_MS = SLOT_MINUTES * MINUTE_MS;
+/** イベントバーの最小表示高さ (短い予定でも視認できるように)。 */
+export const BAR_MIN_HEIGHT_PX = 14;
 
 export interface TimedEventLayout {
   readonly event: CalendarEvent;
@@ -73,4 +80,31 @@ export function layoutTimedEvents(
     const laneCount = Math.max(...overlap.map((o) => o.lane)) + 1;
     return { ...item, laneCount };
   });
+}
+
+/** イベントバーの絶対配置ジオメトリ (px は時間エリア内、% はレーン割)。 */
+export interface BarGeometry {
+  readonly topPx: number;
+  readonly heightPx: number;
+  readonly leftPct: number;
+  readonly widthPct: number;
+}
+
+/**
+ * レーン割当済みイベントを時間エリア内の絶対座標に変換する。
+ * 表示範囲をはみ出す分は上下にクランプし、高さは BAR_MIN_HEIGHT_PX を下限にする。
+ */
+export function barGeometry(
+  layout: TimedEventLayout,
+  gridStartMs: number,
+  timeAreaHeightPx: number,
+): BarGeometry {
+  const rawTop = ((layout.startMs - gridStartMs) / SLOT_DURATION_MS) * SLOT_HEIGHT_PX;
+  const rawBottom = ((layout.endMs - gridStartMs) / SLOT_DURATION_MS) * SLOT_HEIGHT_PX;
+  const topPx = Math.max(0, rawTop);
+  const bottomPx = Math.min(timeAreaHeightPx, rawBottom);
+  const heightPx = Math.max(BAR_MIN_HEIGHT_PX, bottomPx - topPx);
+  const widthPct = 100 / layout.laneCount;
+  const leftPct = (layout.lane / layout.laneCount) * 100;
+  return { topPx, heightPx, leftPct, widthPct };
 }

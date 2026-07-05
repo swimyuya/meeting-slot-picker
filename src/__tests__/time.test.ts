@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  formatDayLabel,
   fromJst,
+  isWeekend,
   toDayISO,
   toHHMM,
   toJstParts,
@@ -36,5 +38,17 @@ describe("time (JST helpers)", () => {
     expect(toHHMM(fromJst(2026, 1, 1, 9, 0))).toBe("9:00");
     expect(toHHMM(fromJst(2026, 1, 1, 13, 30))).toBe("13:30");
     expect(toHHMM(fromJst(2026, 1, 1, 16, 0))).toBe("16:00");
+  });
+
+  it("isWeekend は日(0)と土(6)だけ true", () => {
+    expect(isWeekend(0)).toBe(true);
+    expect(isWeekend(6)).toBe(true);
+    expect(isWeekend(1)).toBe(false);
+    expect(isWeekend(5)).toBe(false);
+  });
+
+  it("formatDayLabel は M/D（曜）形式 (月・日の先頭ゼロなし)", () => {
+    expect(formatDayLabel("2026-01-01", 4)).toBe("1/1（木）");
+    expect(formatDayLabel("2026-07-06", 1)).toBe("7/6（月）");
   });
 });
