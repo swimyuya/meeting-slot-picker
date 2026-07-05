@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // events 経路は Tauri (Google token endpoint 直接呼び出し) を前提に検証する。
 vi.mock("../lib/tauri", () => ({ isTauri: () => true }));
 
-import { fetchEventsBetween, type EventsInput } from "../calendar/events";
+import { fetchGoogleEvents, type GoogleEventsInput } from "../calendar/providers/google";
 import { clearTokenCache } from "../calendar/token";
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -13,7 +13,7 @@ function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
-const input: EventsInput = {
+const input: GoogleEventsInput = {
   auth: { clientId: "cid", refreshToken: "rt" },
   calendarId: "primary",
   timeMin: new Date("2026-01-01T00:00:00Z"),
@@ -30,7 +30,7 @@ function mockFetch(eventsResp: () => Response) {
 
 beforeEach(() => clearTokenCache());
 
-describe("fetchEventsBetween", () => {
+describe("fetchGoogleEvents", () => {
   it("時刻指定の予定を CalendarEvent[] で返す", async () => {
     const fetchFn = mockFetch(() =>
       jsonResponse({
@@ -44,7 +44,7 @@ describe("fetchEventsBetween", () => {
         ],
       }),
     );
-    const out = await fetchEventsBetween(input, { fetchFn, now: () => 0 });
+    const out = await fetchGoogleEvents(input, { fetchFn, now: () => 0 });
     expect(out).toEqual([
       {
         id: "g:e1",
@@ -65,7 +65,7 @@ describe("fetchEventsBetween", () => {
         ],
       }),
     );
-    const out = await fetchEventsBetween(input, { fetchFn, now: () => 0 });
+    const out = await fetchGoogleEvents(input, { fetchFn, now: () => 0 });
     expect(out[0]).toMatchObject({ id: "g:h1", summary: "Holiday", allDay: true, source: "google" });
     expect(out[0].start).toBe("2026-01-01T00:00:00+09:00");
     expect(out[0].end).toBe("2026-01-02T00:00:00+09:00");
@@ -83,13 +83,13 @@ describe("fetchEventsBetween", () => {
         ],
       }),
     );
-    const out = await fetchEventsBetween(input, { fetchFn, now: () => 0 });
+    const out = await fetchGoogleEvents(input, { fetchFn, now: () => 0 });
     expect(out[0].summary).toBe("(無題)");
   });
 
   it("events.list URL の path と必須クエリが正しい", async () => {
     const fetchFn = mockFetch(() => jsonResponse({ items: [] }));
-    await fetchEventsBetween(input, { fetchFn, now: () => 0 });
+    await fetchGoogleEvents(input, { fetchFn, now: () => 0 });
     const call = fetchFn.mock.calls.find((c) => String(c[0]).includes("/events"))!;
     const url = new URL(String(call[0]));
     expect(url.pathname).toBe("/calendar/v3/calendars/primary/events");
@@ -101,6 +101,6 @@ describe("fetchEventsBetween", () => {
 
   it("非200は throw する", async () => {
     const fetchFn = mockFetch(() => new Response("err", { status: 401 }));
-    await expect(fetchEventsBetween(input, { fetchFn, now: () => 0 })).rejects.toThrow(/401/);
+    await expect(fetchGoogleEvents(input, { fetchFn, now: () => 0 })).rejects.toThrow(/401/);
   });
 });

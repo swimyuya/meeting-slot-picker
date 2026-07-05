@@ -9,8 +9,6 @@
  * GOOGLE_CLIENT_SECRET は undefined のまま運用する。
  */
 
-import { isTauri } from "./tauri";
-
 export const GOOGLE_CLIENT_ID: string =
   (import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined) ?? "";
 
@@ -27,9 +25,6 @@ export const MICROSOFT_CLIENT_SECRET: string | undefined =
 
 export const isGoogleConfigured = (): boolean => GOOGLE_CLIENT_ID.length > 0;
 export const isMicrosoftConfigured = (): boolean => MICROSOFT_CLIENT_ID.length > 0;
-
-/** 後方互換: 旧 isClientIdConfigured は Google 設定の有無を返す。 */
-export const isClientIdConfigured = (): boolean => isGoogleConfigured();
 
 /**
  * Web ビルド用 API ベース URL。空文字 = 同一オリジン (Vercel 内 /api/* を呼ぶ既定)。
@@ -48,6 +43,3 @@ export function getWebRedirectUri(): string {
   if (typeof window === "undefined") return "";
   return `${window.location.origin}/auth/callback`;
 }
-
-/** 実行環境が Web (PWA / ブラウザ) かどうか。Tauri でない = Web。 */
-export const isWebRuntime = (): boolean => !isTauri();

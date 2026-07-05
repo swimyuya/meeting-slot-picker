@@ -90,17 +90,6 @@ export function buildAuthUrl(
   return `${spec.authEndpoint}?${q.toString()}`;
 }
 
-/** Google legacy 用 buildAuthUrl 互換ラッパー (Google エンドポイント決め打ち)。 */
-export function buildAuthUrlLegacyGoogle(params: {
-  clientId: string;
-  redirectUri: string;
-  scope: string;
-  challenge: string;
-  state: string;
-}): string {
-  return buildAuthUrl(getOAuthProviderSpec("google"), params);
-}
-
 /** authorization code を token endpoint で交換し refresh_token を得る。 */
 export async function exchangeCode(
   spec: ProviderOAuthSpec,
@@ -227,10 +216,6 @@ export async function connect(
   await persistIdentityIfPossible(provider, idToken);
 }
 
-/** 後方互換: Pro 版以前の API。連携する provider は Google 固定。 */
-export const connectGoogle = (config: OAuthConfig, deps: OAuthDeps = {}): Promise<void> =>
-  connect("google", config, deps);
-
 async function defaultCaptureCode(
   port: number,
   authUrl: string,
@@ -315,7 +300,3 @@ export function base64UrlEncode(buffer: ArrayBuffer): string {
   for (const b of bytes) binary += String.fromCharCode(b);
   return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
-
-// 旧コードが import する DEFAULT_SCOPE は Google 用と意味づけて re-export しておく
-// (後方互換: 削除前提)。
-export const DEFAULT_SCOPE = getOAuthProviderSpec("google").defaultScope;

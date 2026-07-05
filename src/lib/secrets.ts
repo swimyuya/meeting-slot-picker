@@ -29,9 +29,6 @@ export const REFRESH_TOKEN_KEYS: Readonly<Record<OAuthProviderId, string>> = {
   microsoft: "microsoft_refresh_token",
 } as const;
 
-/** 後方互換用 (旧 Google 専用版で使われていた定数)。 */
-export const REFRESH_TOKEN_KEY = REFRESH_TOKEN_KEYS.google;
-
 /** Apple CalDAV の認証情報キー。 */
 const APPLE_EMAIL_KEY = "apple_email";
 const APPLE_APP_PASSWORD_KEY = "apple_app_password";
@@ -110,8 +107,6 @@ export const getUserEmail = (): Promise<string | null> => getSecret(USER_EMAIL_K
 
 export const setProviderForIdentity = (provider: OAuthProviderId): Promise<void> =>
   setSecret(PROVIDER_FOR_IDENTITY_KEY, provider);
-export const getProviderForIdentity = (): Promise<string | null> =>
-  getSecret(PROVIDER_FOR_IDENTITY_KEY);
 
 /** 一番最初に連携した日時を保存 (上書きしない)。サブスク trial 起点に使う想定。 */
 export async function setFirstConnectedAtIfMissing(iso: string): Promise<void> {

@@ -32,7 +32,7 @@ export function CallbackPage() {
         await handleAuthCallback();
         if (cancelled) return;
         // ルートに遷移 (履歴は残さない)。SPA の遷移ではなくフル遷移にして
-        // useAuthStatus を含む全ての状態を再初期化する。
+        // useProviderStatus を含む全ての状態を再初期化する。
         window.location.replace("/");
       } catch (e) {
         if (cancelled) return;
