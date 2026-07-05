@@ -1,4 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
+import { seedConnected } from "./helpers";
 
 /**
  * モバイル (iPhone 12) ビューポートでの主要フロー。
@@ -6,31 +7,6 @@ import { expect, test, type Page } from "@playwright/test";
  * - 日付チップで日付を切り替えられる
  * - 30分セルを選択 → コピーボタンへ反映
  */
-
-async function seedConnected(page: Page) {
-  await page.addInitScript(() => {
-    return new Promise<void>((resolve, reject) => {
-      const open = indexedDB.open("meeting-slot-picker", 1);
-      open.onupgradeneeded = () => {
-        const db = open.result;
-        if (!db.objectStoreNames.contains("secrets")) {
-          db.createObjectStore("secrets");
-        }
-      };
-      open.onsuccess = () => {
-        const db = open.result;
-        const tx = db.transaction("secrets", "readwrite");
-        tx.objectStore("secrets").put("e2e-refresh-token", "google_refresh_token");
-        tx.oncomplete = () => {
-          db.close();
-          resolve();
-        };
-        tx.onerror = () => reject(tx.error);
-      };
-      open.onerror = () => reject(open.error);
-    });
-  });
-}
 
 // iPhone 12 と同等の viewport を chromium に当てる (webkit は CI に未インストールでも動かす目的)。
 test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });

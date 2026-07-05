@@ -11,7 +11,7 @@
 > 古い情報は消す前に「履歴 / 完了済み」へ畳む。
 
 
-最終更新: 2026-06-16
+最終更新: 2026-07-06
 
 ---
 
@@ -44,9 +44,15 @@
 ## 1. 現在のフォーカス
 
 - 作業ブランチ: `feature/pro`
-- 直近コミット: ab18ea2 fix(extension): popup の高さを !important で固定 (グリッド非表示問題) (2026-05-29)
-- 直近コミット: `feat(auth): detect invalid_grant and auto-prompt reconnect`（invalid_grant 自動再連携、src 4 + test 3 + 本ファイル、2026-06-16）
-- 未コミット: 1 件（`meeting-slot-picker-pro-extension-0.1.0.zip` ＝ ビルド成果物のみ。意図的に未コミット）/ 未push: 2 件  ← 次セッションで最初に確認。push はユーザー指示待ち
+- 2026-07-06: **大規模リファクタ完了**（14 コミット、挙動保存）。全ゲート緑: vitest 234 / tsc 0 / web+extension ビルド / Playwright e2e 5 passed 1 skipped(設計) / ピクセル一致検証済み
+  - 重複解消: OAuth 3 フロー→`oauth-core.ts` 共有化 / WeekGrid↔MobileDayView のバー描画→`EventBars.tsx` / api/_lib google↔microsoft→`token-request.ts` / provider→ラベル・色・prefix→`lib/provider-ui.ts` / 資格情報 ternary→`getOAuthClientCredentials`
+  - 分割: App.tsx の Tauri メニューバー挙動→`hooks/useTauriMenubar.ts`（blur中連携ガード含む・新規テスト5本）/ SettingsPanel→`ShortcutRecorder.tsx` 抽出 / ショートカット表示 2 形式→`lib/shortcut-format.ts`（**出力が違うので統一していない**）
+  - デッドコード削除: connectGoogle / useAuthStatus / events.ts シム / env.ts の意味が食い違う isWebRuntime ほか計 10 シンボル・3 ファイル
+  - テスト補強: 198→234（dispatch 分岐 / バーのピクセル pin / api MS 分岐+refresh ハンドラ / scope 同期 / メニューバー挙動）
+  - **fix(updater)**: CI が `latest.json` を上げていたが app は `pro-latest.json` をポーリング→CI 側を修正。`VERSION="${TAG#pro-v}"` も修正（旧 `#v` では pro-v タグから剥がれず非 semver になっていた）。RELEASE.md のタグ手順も pro-vX.Y.Z 明記
+  - zip はビルド成果物として **untrack 済み**（.gitignore パターンを pro- 対応に修正、package-extension.mjs の出力名も pro- 付きに統一）→「意図的に未コミット」運用は解消
+  - e2e の stale アサーション修正（旧 Google 専用版の「Google カレンダーと連携」→ Pro 版 UI 文言。Pro 化以降ずっと落ちていた）
+- 未 push: 16 コミット（invalid_grant 2 件 + リファクタ 14 件）。**push はユーザー指示待ち**
 
 ## 2. これまでの大きな流れ（直近コミット）
 
@@ -92,11 +98,17 @@
 
 ## 4. 既知の注意点 / gotcha
 
-- （特記事項は作業中に追記）
+- **Tauri デスクトップ版から Apple 連携が構成上到達不能**（2026-07-06 調査で発見・未修正）: tauri.conf.json の CSP `connect-src` と capabilities の http allowlist に `*.vercel.app` / `caldav.icloud.com` が無い。Apple 連携は Vercel API 経由のため、デスクトップ版では繋がらないはず。Web/PWA・Chrome 拡張では動く。desktop で有効にするなら CSP+capability 追加＋実機検証が必要（product 判断待ち）
+- api/calendar/apple/events は time_min < time_max / 期間上限を未検証（堅牢性の改善余地、未対応）
+- トレイ tooltip・コード内コメントの "Ctrl+Shift+U" 誤記は残存（macOS 実際は ⌘+Shift+U）
+- リファクタ後の設計メモ: プラットフォーム分岐は `lib/tauri.ts`、OAuth 共有部は `auth/oauth-core.ts`、provider→UI 表現は `lib/provider-ui.ts`、バー描画は `components/EventBars.tsx`（week/day の見た目差は VARIANTS で意図的に保持）。MS の OAuth scope は client/server 二重定義のまま `api/__tests__/scope-sync.test.ts` が同値を強制
+- useTauriMenubar（Escape/フォーカスで隠す挙動）は unit テスト済みだが、次回 `npm run tauri:dev` 起動時に手動でも一度確認推奨（jsdom では実フォーカス再現不可）
 
 ## 5. 次にやること / open threads
 
-- （次セッションで具体化。未コミット / 未push があれば最優先で確認）
+- feature/pro の 16 コミットを push（ユーザー指示待ち）
+- Apple×デスクトップの扱いを決める（CSP 追加して有効化 or Web/拡張専用と明記）
+- 将来リリース時: pro-vX.Y.Z タグで CI 発火（RELEASE.md 更新済み手順に従う）
 
 ## 6. 履歴 / 完了済み
 

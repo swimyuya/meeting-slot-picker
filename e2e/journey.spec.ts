@@ -1,33 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
-
-/**
- * ページ読み込み前に refresh_token を IndexedDB に種まきして連携済み状態にする。
- * Web 版は secrets を IndexedDB (DB: meeting-slot-picker, store: secrets) に保存する。
- */
-async function seedConnected(page: Page) {
-  await page.addInitScript(() => {
-    return new Promise<void>((resolve, reject) => {
-      const open = indexedDB.open("meeting-slot-picker", 1);
-      open.onupgradeneeded = () => {
-        const db = open.result;
-        if (!db.objectStoreNames.contains("secrets")) {
-          db.createObjectStore("secrets");
-        }
-      };
-      open.onsuccess = () => {
-        const db = open.result;
-        const tx = db.transaction("secrets", "readwrite");
-        tx.objectStore("secrets").put("e2e-refresh-token", "google_refresh_token");
-        tx.oncomplete = () => {
-          db.close();
-          resolve();
-        };
-        tx.onerror = () => reject(tx.error);
-      };
-      open.onerror = () => reject(open.error);
-    });
-  });
-}
+import { expect, test } from "@playwright/test";
+import { seedConnected } from "./helpers";
 
 test.describe("日程ピッカー 中核フロー (Web UI 層)", () => {
   // 外部 Google / Vercel API へは遮断し、ハーメチックに保つ。
@@ -40,8 +12,9 @@ test.describe("日程ピッカー 中核フロー (Web UI 層)", () => {
 
   test("未連携時は連携案内 (ConnectPrompt) を表示する", async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByText("Google カレンダーと連携")).toBeVisible();
-    await expect(page.getByRole("button", { name: /連携する/ })).toBeVisible();
+    // Pro 版 UI (旧 Google 専用版の「Google カレンダーと連携」から変更済み)
+    await expect(page.getByRole("heading", { name: "カレンダーと連携" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Google と連携する" })).toBeVisible();
   });
 
   test("枠選択 → 連続結合プレビュー → クリップボードへコピー", async ({ page, context }) => {
