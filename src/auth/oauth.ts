@@ -1,35 +1,42 @@
 /**
- * Tauri (デスクトップ) 用 OAuth フロー — loopback + PKCE。
+ * OAuth エントリポイント — ランタイム dispatch + Tauri (デスクトップ) フロー。
  *
- * Pro 版では provider (Google / Microsoft) を引数で受け取り、各々の
- * 認可エンドポイント / tokenエンドポイント / scope に応じて動作する。
+ * 実行環境による dispatch (connect):
+ *   - Chrome 拡張機能 → background SW へ委譲 (signInExtension が SW 内で実行される)
+ *   - Web (PWA)      → signInWeb (リダイレクトして return しない)
+ *   - Tauri          → loopback + PKCE で本ファイル内で完結
  *
- * フロー:
+ * デスクトップフロー:
  *   1. PKCE (verifier / S256 challenge) を生成
  *   2. 認可 URL を組み立て、Rust 側 (oauth_capture_code) が loopback サーバ起動＋ブラウザを開く
  *   3. リダイレクトの ?code= を受け取り、token endpoint で refresh_token に交換
  *   4. refresh_token を Keychain に provider 別キーで保存
  *   5. id_token から email を取り出して identity ストアに保存 (将来のサブスク用)
  *
- * Web (PWA) / Chrome 拡張ランタイムでは、各々のフローへ自動 dispatch する。
+ * PKCE / URL 組み立て / token 交換などの共有プリミティブは oauth-core.ts に置き、
+ * ここから re-export する (既存 import 互換)。
  */
 
 import { getWebRedirectUri } from "../lib/env";
-import { httpFetch, safeErrorBody, type HttpFetch } from "../lib/http";
-import {
-  setFirstConnectedAtIfMissing,
-  setProviderForIdentity,
-  setRefreshToken,
-  setUserEmail,
-} from "../lib/secrets";
+import { type HttpFetch } from "../lib/http";
+import { setRefreshToken } from "../lib/secrets";
 import { isExtension, isTauri } from "../lib/tauri";
-import { emailFromIdToken } from "./identity";
 import {
-  getOAuthProviderSpec,
-  getProviderSpec,
-  type OAuthProviderId,
-  type ProviderOAuthSpec,
-} from "./providers";
+  exchangeCode,
+  persistIdentityIfPossible,
+  prepareAuthRequest,
+  requireClientId,
+} from "./oauth-core";
+import { getOAuthProviderSpec, type OAuthProviderId } from "./providers";
+
+export {
+  base64UrlEncode,
+  buildAuthUrl,
+  exchangeCode,
+  generatePkce,
+  generateState,
+  persistIdentityIfPossible,
+} from "./oauth-core";
 
 const DEFAULT_TIMEOUT_SECS = 180;
 
@@ -47,115 +54,16 @@ export interface OAuthDeps {
 }
 
 /**
- * PKCE の code_verifier と S256 code_challenge を生成する。
- * RFC 7636 は 32–96 bytes を許容、推奨は 48 bytes 程度。
- * 余裕を持たせて 48 bytes (base64url で 64 文字、384 bits エントロピー) にする。
- */
-export async function generatePkce(): Promise<{ verifier: string; challenge: string }> {
-  const random = new Uint8Array(48);
-  crypto.getRandomValues(random);
-  const verifier = base64UrlEncode(random.buffer);
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier));
-  const challenge = base64UrlEncode(digest);
-  return { verifier, challenge };
-}
-
-/**
- * 認可 URL を組み立てる。provider 仕様 (extraAuthParams) を反映するので
- * Google の access_type=offline / Microsoft の prompt=select_account も入る。
- */
-export function buildAuthUrl(
-  spec: ProviderOAuthSpec,
-  params: {
-    clientId: string;
-    redirectUri: string;
-    scope: string;
-    challenge: string;
-    state: string;
-  },
-): string {
-  const q = new URLSearchParams({
-    client_id: params.clientId,
-    redirect_uri: params.redirectUri,
-    response_type: "code",
-    scope: params.scope,
-    state: params.state,
-    code_challenge: params.challenge,
-    code_challenge_method: "S256",
-  });
-  // provider 固有の追加クエリ (access_type=offline / prompt=consent 等)
-  for (const [k, v] of Object.entries(spec.extraAuthParams ?? {})) {
-    q.set(k, v);
-  }
-  return `${spec.authEndpoint}?${q.toString()}`;
-}
-
-/** authorization code を token endpoint で交換し refresh_token を得る。 */
-export async function exchangeCode(
-  spec: ProviderOAuthSpec,
-  input: {
-    clientId: string;
-    clientSecret?: string;
-    code: string;
-    codeVerifier: string;
-    redirectUri: string;
-  },
-  deps: { fetchFn?: HttpFetch } = {},
-): Promise<{ refreshToken: string; accessToken: string; idToken: string | undefined }> {
-  const fetchFn = deps.fetchFn ?? httpFetch;
-  const body = new URLSearchParams({
-    code: input.code,
-    client_id: input.clientId,
-    redirect_uri: input.redirectUri,
-    grant_type: "authorization_code",
-    code_verifier: input.codeVerifier,
-  });
-  if (input.clientSecret) body.set("client_secret", input.clientSecret);
-
-  const res = await fetchFn(spec.tokenEndpoint, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body,
-  });
-  if (!res.ok) {
-    throw new Error(`oauth token exchange failed: ${res.status} ${await safeErrorBody(res)}`);
-  }
-  const json = (await res.json()) as {
-    refresh_token?: string;
-    access_token?: string;
-    id_token?: string;
-  };
-  if (!json.refresh_token) {
-    throw new Error(spec.noRefreshTokenMessage);
-  }
-  return {
-    refreshToken: json.refresh_token,
-    accessToken: json.access_token ?? "",
-    idToken: json.id_token,
-  };
-}
-
-/**
- * OAuth フロー全体を実行する (provider 引数化版)。
- *
- * 実行環境による dispatch:
- *   - Chrome 拡張機能 → signInExtension(provider, ...)
- *   - Web (PWA)      → signInWeb(provider, ...) (リダイレクトして return しない)
- *   - Tauri          → loopback で完結 (本関数内)
+ * OAuth フロー全体を実行する。実行環境を判定して適切なフローへ dispatch する。
+ * テスト時は deps.captureCode が指定されるので、その場合は Tauri 経路に流す。
  */
 export async function connect(
   provider: OAuthProviderId,
   config: OAuthConfig,
   deps: OAuthDeps = {},
 ): Promise<void> {
-  if (!config.clientId) {
-    throw new Error(
-      `${getProviderSpec(provider).displayName}: client_id が未設定です (.env.local を確認してください)。`,
-    );
-  }
-  const spec = getOAuthProviderSpec(provider);
+  requireClientId(provider, config.clientId, " (.env.local を確認してください)");
 
-  // テスト時は deps.captureCode が指定されるので、その場合は Tauri 経路に流す。
   if (!deps.captureCode) {
     if (isExtension()) {
       // popup から OAuth を始めると launchWebAuthFlow 中に popup が閉じて promise が
@@ -181,20 +89,24 @@ export async function connect(
     }
   }
 
-  // Tauri loopback フロー
+  await connectDesktop(provider, config, deps);
+}
+
+/** Tauri loopback フロー本体。 */
+async function connectDesktop(
+  provider: OAuthProviderId,
+  config: OAuthConfig,
+  deps: OAuthDeps,
+): Promise<void> {
+  const spec = getOAuthProviderSpec(provider);
   const port = config.port ?? spec.defaultPort;
-  const scope = config.scope ?? spec.defaultScope;
   // RFC 8252 準拠で 127.0.0.1 を使う (localhost だと IPv6 解決で取りこぼす恐れ)。
   const redirectUri = `http://127.0.0.1:${port}`;
 
-  const { verifier, challenge } = await generatePkce();
-  const state = generateState();
-  const authUrl = buildAuthUrl(spec, {
+  const { verifier, state, authUrl } = await prepareAuthRequest(spec, {
     clientId: config.clientId,
     redirectUri,
-    scope,
-    challenge,
-    state,
+    scope: config.scope,
   });
 
   const capture = deps.captureCode ?? defaultCaptureCode;
@@ -228,25 +140,6 @@ async function defaultCaptureCode(
     expectedState,
     timeoutSecs: DEFAULT_TIMEOUT_SECS,
   });
-}
-
-/**
- * id_token から email を取り出して保存。サブスク化したときに user 識別子として使う。
- * 失敗しても OAuth 自体は成功扱いにする (cosmetic な情報なので)。
- */
-export async function persistIdentityIfPossible(
-  provider: OAuthProviderId,
-  idToken: string | undefined,
-): Promise<void> {
-  try {
-    const email = emailFromIdToken(idToken);
-    if (!email) return;
-    await setUserEmail(email);
-    await setProviderForIdentity(provider);
-    await setFirstConnectedAtIfMissing(new Date().toISOString());
-  } catch {
-    // 失敗は無視。connect 自体は成功させる
-  }
 }
 
 /**
@@ -285,18 +178,4 @@ async function sendOAuthToBackground(
       },
     );
   });
-}
-
-/** CSRF 対策の state。256 bits (32 bytes) のランダム値で衝突・推測耐性を確保。 */
-export function generateState(): string {
-  const random = new Uint8Array(32);
-  crypto.getRandomValues(random);
-  return base64UrlEncode(random.buffer);
-}
-
-export function base64UrlEncode(buffer: ArrayBuffer): string {
-  const bytes = new Uint8Array(buffer);
-  let binary = "";
-  for (const b of bytes) binary += String.fromCharCode(b);
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }

@@ -15,20 +15,14 @@
  * Web Application client では client_secret 必須のため。
  */
 
-import { getApiBaseUrl } from "../lib/env";
+import { setRefreshToken } from "../lib/secrets";
 import {
-  setFirstConnectedAtIfMissing,
-  setProviderForIdentity,
-  setRefreshToken,
-  setUserEmail,
-} from "../lib/secrets";
-import { emailFromIdToken } from "./identity";
-import { buildAuthUrl, generatePkce, generateState } from "./oauth";
-import {
-  getOAuthProviderSpec,
-  getProviderSpec,
-  type OAuthProviderId,
-} from "./providers";
+  exchangeViaServer,
+  persistIdentityIfPossible,
+  prepareAuthRequest,
+  requireClientId,
+} from "./oauth-core";
+import { getOAuthProviderSpec, type OAuthProviderId } from "./providers";
 
 const VERIFIER_KEY = "msp:oauth:verifier";
 const STATE_KEY = "msp:oauth:state";
@@ -49,29 +43,17 @@ export async function signInWeb(
   provider: OAuthProviderId,
   config: WebSignInConfig,
 ): Promise<never> {
-  if (!config.clientId) {
-    throw new Error(
-      `${getProviderSpec(provider).displayName}: client_id が未設定です。`,
-    );
-  }
+  requireClientId(provider, config.clientId);
   if (!config.redirectUri) {
     throw new Error("redirect_uri が空です。");
   }
   const spec = getOAuthProviderSpec(provider);
-  const { verifier, challenge } = await generatePkce();
-  const state = generateState();
+  const { verifier, state, authUrl } = await prepareAuthRequest(spec, config);
   sessionStorage.setItem(VERIFIER_KEY, verifier);
   sessionStorage.setItem(STATE_KEY, state);
   sessionStorage.setItem(REDIRECT_KEY, config.redirectUri);
   sessionStorage.setItem(PROVIDER_KEY, provider);
 
-  const authUrl = buildAuthUrl(spec, {
-    clientId: config.clientId,
-    redirectUri: config.redirectUri,
-    scope: config.scope ?? spec.defaultScope,
-    challenge,
-    state,
-  });
   window.location.href = authUrl;
   // 遷移を待つ間に Promise を解決させないため、無限に pending する
   return new Promise<never>(() => {});
@@ -81,7 +63,6 @@ export async function signInWeb(
 export async function handleAuthCallback(
   deps: { fetchFn?: typeof fetch } = {},
 ): Promise<void> {
-  const fetchFn = deps.fetchFn ?? fetch;
   const params = new URLSearchParams(window.location.search);
   const code = params.get("code");
   const state = params.get("state");
@@ -112,39 +93,14 @@ export async function handleAuthCallback(
     throw new Error("state が一致しません (CSRF の可能性があります)。");
   }
 
-  const apiUrl = `${getApiBaseUrl()}/api/auth/exchange`;
-  const res = await fetchFn(apiUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      provider,
-      code,
-      code_verifier: verifier,
-      redirect_uri: redirectUri,
-    }),
-  });
-
-  if (!res.ok) {
-    const body = await safeJson(res);
-    throw new Error(`/api/auth/exchange 失敗: ${res.status} ${body.message ?? body.error ?? ""}`);
-  }
-  const json = (await res.json()) as { refresh_token?: string; id_token?: string };
-  if (!json.refresh_token) {
-    throw new Error("refresh_token がレスポンスに含まれません。");
-  }
-  await setRefreshToken(provider, json.refresh_token);
-
-  // identity (email) を保存 — 失敗は無視
-  try {
-    const email = emailFromIdToken(json.id_token);
-    if (email) {
-      await setUserEmail(email);
-      await setProviderForIdentity(provider);
-      await setFirstConnectedAtIfMissing(new Date().toISOString());
-    }
-  } catch {
-    /* ignore */
-  }
+  const { refreshToken, idToken } = await exchangeViaServer(
+    provider,
+    { code, codeVerifier: verifier, redirectUri },
+    { fetchFn: deps.fetchFn },
+  );
+  await setRefreshToken(provider, refreshToken);
+  // identity (email) を保存 — 失敗は無視 (persistIdentityIfPossible 内で握る)
+  await persistIdentityIfPossible(provider, idToken);
 
   clearOAuthSession();
 }
@@ -155,8 +111,4 @@ export function clearOAuthSession(): void {
   sessionStorage.removeItem(STATE_KEY);
   sessionStorage.removeItem(REDIRECT_KEY);
   sessionStorage.removeItem(PROVIDER_KEY);
-}
-
-async function safeJson(res: Response): Promise<{ error?: string; message?: string }> {
-  return (await res.json().catch(() => ({}))) as { error?: string; message?: string };
 }

@@ -12,19 +12,14 @@
  */
 
 import { getApiBaseUrl } from "../lib/env";
+import { setRefreshToken } from "../lib/secrets";
 import {
-  setFirstConnectedAtIfMissing,
-  setProviderForIdentity,
-  setRefreshToken,
-  setUserEmail,
-} from "../lib/secrets";
-import { emailFromIdToken } from "./identity";
-import { buildAuthUrl, generatePkce, generateState } from "./oauth";
-import {
-  getOAuthProviderSpec,
-  getProviderSpec,
-  type OAuthProviderId,
-} from "./providers";
+  exchangeViaServer,
+  persistIdentityIfPossible,
+  prepareAuthRequest,
+  requireClientId,
+} from "./oauth-core";
+import { getOAuthProviderSpec, type OAuthProviderId } from "./providers";
 
 interface ChromeIdentityLike {
   identity: {
@@ -58,24 +53,15 @@ export async function signInExtension(
   config: ExtensionSignInConfig,
   deps: ExtensionSignInDeps = {},
 ): Promise<void> {
-  if (!config.clientId) {
-    throw new Error(
-      `${getProviderSpec(provider).displayName}: client_id が未設定です。`,
-    );
-  }
-  const fetchFn = deps.fetchFn ?? fetch;
+  requireClientId(provider, config.clientId);
   const identity = getChromeIdentity();
   const redirectUri = identity.identity.getRedirectURL();
   const spec = getOAuthProviderSpec(provider);
 
-  const { verifier, challenge } = await generatePkce();
-  const state = generateState();
-  const authUrl = buildAuthUrl(spec, {
+  const { verifier, state, authUrl } = await prepareAuthRequest(spec, {
     clientId: config.clientId,
     redirectUri,
-    scope: config.scope ?? spec.defaultScope,
-    challenge,
-    state,
+    scope: config.scope,
   });
 
   const redirected = await identity.identity.launchWebAuthFlow({
@@ -104,44 +90,18 @@ export async function signInExtension(
 
   // 環境変数 VITE_API_BASE_URL から取得。Pro 拡張ビルドでは必ず設定する想定。
   // 未設定なら明示的にエラーで知らせる (静的フォールバックで本番 URL を叩く事故を防ぐ)。
-  const apiBase = getApiBaseUrl();
-  if (!apiBase) {
+  // ※ このチェックは拡張だけ (Web は同一オリジンの /api/* が既定なので空文字が正常)。
+  if (!getApiBaseUrl()) {
     throw new Error(
       "VITE_API_BASE_URL が未設定です。拡張ビルド時に環境変数を設定してください。",
     );
   }
-  const apiUrl = `${apiBase}/api/auth/exchange`;
-  const res = await fetchFn(apiUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      provider,
-      code,
-      code_verifier: verifier,
-      redirect_uri: redirectUri,
-    }),
-  });
-  if (!res.ok) {
-    const body = (await res.json().catch(() => ({}))) as { error?: string; message?: string };
-    throw new Error(
-      `/api/auth/exchange 失敗: ${res.status} ${body.message ?? body.error ?? ""}`,
-    );
-  }
-  const json = (await res.json()) as { refresh_token?: string; id_token?: string };
-  if (!json.refresh_token) {
-    throw new Error("refresh_token がレスポンスに含まれません。");
-  }
-  await setRefreshToken(provider, json.refresh_token);
-
-  // identity (email) を保存 — 失敗は無視
-  try {
-    const email = emailFromIdToken(json.id_token);
-    if (email) {
-      await setUserEmail(email);
-      await setProviderForIdentity(provider);
-      await setFirstConnectedAtIfMissing(new Date().toISOString());
-    }
-  } catch {
-    /* ignore */
-  }
+  const { refreshToken, idToken } = await exchangeViaServer(
+    provider,
+    { code, codeVerifier: verifier, redirectUri },
+    { fetchFn: deps.fetchFn },
+  );
+  await setRefreshToken(provider, refreshToken);
+  // identity (email) を保存 — 失敗は無視 (persistIdentityIfPossible 内で握る)
+  await persistIdentityIfPossible(provider, idToken);
 }
