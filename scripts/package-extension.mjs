@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * dist-extension/ を ZIP にまとめて Chrome Web Store に申請可能な形に。
- * 出力: meeting-slot-picker-extension-<version>.zip (リポジトリルート)
+ * 出力: meeting-slot-picker-pro-extension-<version>.zip (リポジトリルート)
  *
  * 事前に `npm run build:extension` で dist-extension/ を作っておくこと。
  */
@@ -16,7 +16,7 @@ const ROOT = resolve(__dirname, "..");
 const DIST = resolve(ROOT, "dist-extension");
 const PKG = JSON.parse(readFileSync(resolve(ROOT, "package.json"), "utf8"));
 const VERSION = PKG.version;
-const ZIP_NAME = `meeting-slot-picker-extension-${VERSION}.zip`;
+const ZIP_NAME = `meeting-slot-picker-pro-extension-${VERSION}.zip`;
 const ZIP_PATH = resolve(ROOT, ZIP_NAME);
 
 if (!existsSync(DIST)) {

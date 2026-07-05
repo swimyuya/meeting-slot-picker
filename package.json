@@ -18,6 +18,7 @@
     "tauri:build": "tauri build",
     "test": "vitest run",
     "test:watch": "vitest",
+    "typecheck": "tsc -b",
     "coverage": "vitest run --coverage",
     "e2e": "playwright test"
   },
@@ -55,7 +56,6 @@
     "jsdom": "^25.0.1",
     "postcss": "^8.4.49",
     "sharp": "^0.34.5",
-    "sinon-chrome": "^3.0.1",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.7.2",
     "vite": "^6.0.5",
