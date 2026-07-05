@@ -1,6 +1,7 @@
 import { useRef } from "react";
 import type { CalendarEvent } from "../calendar/types";
 import type { Slot } from "../domain/slots";
+import { eventSourcePrefix } from "../lib/provider-ui";
 import { toHHMM, toJstParts } from "../lib/time";
 
 interface Props {
@@ -105,12 +106,7 @@ function isTouchLike(pointerType: string): boolean {
 }
 
 function formatEventLine(ev: CalendarEvent): string {
-  const prefix =
-    ev.source === "microsoft"
-      ? "Outlook: "
-      : ev.source === "apple"
-        ? "Apple: "
-        : "";
+  const prefix = eventSourcePrefix(ev.source);
   if (ev.allDay) return `終日 ${prefix}${ev.summary}`;
   const startD = new Date(ev.start);
   const endD = new Date(ev.end);

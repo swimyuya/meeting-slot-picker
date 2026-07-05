@@ -1,15 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import type { CalendarEvent } from "../calendar/types";
-import {
-  eventsForDay,
-  layoutTimedEvents,
-  SLOT_DURATION_MS,
-  SLOT_HEIGHT_PX,
-} from "../domain/dayLayout";
+import { eventsForDay, layoutTimedEvents, SLOT_HEIGHT_PX } from "../domain/dayLayout";
 import type { Selection } from "../domain/selection";
 import type { DayColumn } from "../domain/slots";
 import { useHorizontalSwipe } from "../hooks/useHorizontalSwipe";
-import { parseDayISO, toHHMM, WEEKDAYS } from "../lib/time";
+import { formatDayLabel, toHHMM } from "../lib/time";
+import { EventBars } from "./EventBars";
 import { SlotCell } from "./SlotCell";
 
 interface Props {
@@ -81,7 +77,9 @@ export function MobileDayView({
         >
           ←
         </button>
-        <span className="text-base font-semibold text-gray-800">{longDayLabel(col)}</span>
+        <span className="text-base font-semibold text-gray-800">
+          {formatDayLabel(col.dayISO, col.weekday)}
+        </span>
         <button
           type="button"
           aria-label="次の日"
@@ -154,49 +152,12 @@ export function MobileDayView({
                 onEnter={onCellEnter}
               />
             ))}
-            {layouts.map((layout) => {
-              const rawTop = ((layout.startMs - gridStartMs) / SLOT_DURATION_MS) * SLOT_HEIGHT_PX;
-              const rawBottom = ((layout.endMs - gridStartMs) / SLOT_DURATION_MS) * SLOT_HEIGHT_PX;
-              const top = Math.max(0, rawTop);
-              const bottom = Math.min(timeAreaHeight, rawBottom);
-              const height = Math.max(14, bottom - top);
-              const widthPct = 100 / layout.laneCount;
-              const leftPct = (layout.lane / layout.laneCount) * 100;
-              const startStr = toHHMM(new Date(layout.event.start));
-              const endStr = toHHMM(new Date(layout.event.end));
-              const src = layout.event.source;
-              const colorCls =
-                src === "microsoft"
-                  ? "border-sky-400/40 bg-sky-200/55"
-                  : src === "apple"
-                    ? "border-pink-400/40 bg-pink-200/55"
-                    : "border-gray-400/40 bg-gray-300/55";
-              const prefix =
-                src === "microsoft" ? "Outlook: " : src === "apple" ? "Apple: " : "";
-              const titleText = `${startStr}-${endStr} ${prefix}${layout.event.summary}`;
-              return (
-                <div
-                  key={layout.event.id}
-                  data-event-id={layout.event.id}
-                  data-event-source={layout.event.source ?? "google"}
-                  title={titleText}
-                  className={`pointer-events-none absolute z-10 overflow-hidden rounded border px-1 text-[11px] leading-tight text-gray-900 ${colorCls}`}
-                  style={{
-                    top,
-                    height,
-                    left: `calc(${leftPct}% + 2px)`,
-                    width: `calc(${widthPct}% - 4px)`,
-                  }}
-                >
-                  <div className="truncate font-medium">{layout.event.summary}</div>
-                  {height >= 26 && (
-                    <div className="truncate text-[10px] text-gray-700">
-                      {startStr}-{endStr}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+            <EventBars
+              layouts={layouts}
+              gridStartMs={gridStartMs}
+              timeAreaHeight={timeAreaHeight}
+              variant="day"
+            />
           </div>
         </div>
       </div>
@@ -204,15 +165,9 @@ export function MobileDayView({
   );
 }
 
-function longDayLabel(col: DayColumn): string {
-  const { month, day } = parseDayISO(col.dayISO);
-  return `${month}/${day}（${WEEKDAYS[col.weekday]}）`;
-}
-
-/** 日付チップの短いラベル: 今日/明日/曜日 */
+/** 日付チップの短いラベル: 今日/明日/日付。 */
 function shortDayLabel(col: DayColumn, idx: number): string {
   if (idx === 0) return "今日";
   if (idx === 1) return "明日";
-  const { month, day } = parseDayISO(col.dayISO);
-  return `${month}/${day}（${WEEKDAYS[col.weekday]}）`;
+  return formatDayLabel(col.dayISO, col.weekday);
 }

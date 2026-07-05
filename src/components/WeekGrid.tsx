@@ -1,13 +1,9 @@
 import type { CalendarEvent } from "../calendar/types";
-import {
-  eventsForDay,
-  layoutTimedEvents,
-  SLOT_DURATION_MS,
-  SLOT_HEIGHT_PX,
-} from "../domain/dayLayout";
+import { eventsForDay, layoutTimedEvents, SLOT_HEIGHT_PX } from "../domain/dayLayout";
 import type { Selection } from "../domain/selection";
 import type { DayColumn } from "../domain/slots";
-import { parseDayISO, toHHMM, WEEKDAYS } from "../lib/time";
+import { formatDayLabel, toHHMM } from "../lib/time";
+import { EventBars } from "./EventBars";
 import { SlotCell } from "./SlotCell";
 
 interface Props {
@@ -73,7 +69,7 @@ export function WeekGrid({ columns, events, selection, onCellDown, onCellEnter }
           >
             {/* 日付ヘッダ */}
             <div className="h-7 border-b border-gray-100 bg-white py-1 text-center text-xs font-medium text-gray-700">
-              {dayLabel(col)}
+              {formatDayLabel(col.dayISO, col.weekday)}
             </div>
             {/* 終日ストリップ (各予定が独立バー、複数あれば縦に積む) */}
             <div
@@ -103,59 +99,16 @@ export function WeekGrid({ columns, events, selection, onCellDown, onCellEnter }
                   onEnter={onCellEnter}
                 />
               ))}
-              {/* 時刻予定バー (source で薄く色分け: Google=グレー, Microsoft=水色) */}
-              {layouts.map((layout) => {
-                const rawTop = ((layout.startMs - gridStartMs) / SLOT_DURATION_MS) * SLOT_HEIGHT_PX;
-                const rawBottom = ((layout.endMs - gridStartMs) / SLOT_DURATION_MS) * SLOT_HEIGHT_PX;
-                const top = Math.max(0, rawTop);
-                const bottom = Math.min(timeAreaHeight, rawBottom);
-                const height = Math.max(14, bottom - top);
-                const widthPct = 100 / layout.laneCount;
-                const leftPct = (layout.lane / layout.laneCount) * 100;
-                const startStr = toHHMM(new Date(layout.event.start));
-                const endStr = toHHMM(new Date(layout.event.end));
-                const src = layout.event.source;
-                const colorCls =
-                  src === "microsoft"
-                    ? "border-sky-400/40 bg-sky-200/55"
-                    : src === "apple"
-                      ? "border-pink-400/40 bg-pink-200/55"
-                      : "border-gray-400/40 bg-gray-300/55";
-                const prefix =
-                  src === "microsoft" ? "Outlook: " : src === "apple" ? "Apple: " : "";
-                const titleText = `${startStr}-${endStr} ${prefix}${layout.event.summary}`;
-                return (
-                  <div
-                    key={layout.event.id}
-                    data-event-id={layout.event.id}
-                    data-event-source={layout.event.source ?? "google"}
-                    title={titleText}
-                    className={`pointer-events-none absolute z-10 overflow-hidden rounded border px-1 text-[10px] leading-tight text-gray-900 ${colorCls}`}
-                    style={{
-                      top,
-                      height,
-                      left: `calc(${leftPct}% + 1px)`,
-                      width: `calc(${widthPct}% - 2px)`,
-                    }}
-                  >
-                    <div className="truncate font-medium">{layout.event.summary}</div>
-                    {height >= 24 && (
-                      <div className="truncate text-[9px] text-gray-700">
-                        {startStr}-{endStr}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+              <EventBars
+                layouts={layouts}
+                gridStartMs={gridStartMs}
+                timeAreaHeight={timeAreaHeight}
+                variant="week"
+              />
             </div>
           </div>
         ))}
       </div>
     </div>
   );
-}
-
-function dayLabel(col: DayColumn): string {
-  const { month, day } = parseDayISO(col.dayISO);
-  return `${month}/${day}（${WEEKDAYS[col.weekday]}）`;
 }
