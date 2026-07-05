@@ -26,6 +26,12 @@ describe("App (Pro 版: 複数 provider 対応)", () => {
     await waitFor(() => expect(screen.getByText("9:00")).toBeInTheDocument());
   });
 
+  it("ヘッダに既定ショートカットを Ctrl+Shift+U 形式で表示する", async () => {
+    render(<App />);
+    await screen.findByText("日程ピッカー Pro");
+    expect(screen.getByText("Ctrl+Shift+U")).toBeInTheDocument();
+  });
+
   it("枠を選択するとプレビューに反映されコピーできる", async () => {
     await setRefreshToken("google", "rt");
     render(<App />);
