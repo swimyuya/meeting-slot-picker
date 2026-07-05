@@ -4,12 +4,7 @@ import { fetchEventsForProvider } from "../calendar/providers";
 import { isAuthExpiredError } from "../calendar/token";
 import type { CalendarEvent } from "../calendar/types";
 import type { AppConfig } from "../lib/config";
-import {
-  GOOGLE_CLIENT_ID,
-  GOOGLE_CLIENT_SECRET,
-  MICROSOFT_CLIENT_ID,
-  MICROSOFT_CLIENT_SECRET,
-} from "../lib/env";
+import { getOAuthClientCredentials } from "../lib/env";
 import { errMessage } from "../lib/error";
 import { getAppleCredentials, getRefreshToken } from "../lib/secrets";
 import { DAY_MS, startOfJstDay } from "../lib/time";
@@ -73,12 +68,9 @@ export function useBusyTimes(
       if (!isOAuthProvider(provider)) return { provider, events: [] as CalendarEvent[] };
       const refreshToken = await getRefreshToken(provider);
       if (!refreshToken) return { provider, events: [] as CalendarEvent[] };
-      const clientId = provider === "google" ? GOOGLE_CLIENT_ID : MICROSOFT_CLIENT_ID;
-      const clientSecret =
-        provider === "google" ? GOOGLE_CLIENT_SECRET : MICROSOFT_CLIENT_SECRET;
       const fetched = await fetchEventsForProvider({
         provider,
-        auth: { clientId, clientSecret, refreshToken },
+        auth: { ...getOAuthClientCredentials(provider), refreshToken },
         calendarId,
         timeMin,
         timeMax,

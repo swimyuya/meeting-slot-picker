@@ -9,6 +9,8 @@
  * GOOGLE_CLIENT_SECRET は undefined のまま運用する。
  */
 
+import type { OAuthProviderId } from "../auth/providers";
+
 export const GOOGLE_CLIENT_ID: string =
   (import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined) ?? "";
 
@@ -25,6 +27,16 @@ export const MICROSOFT_CLIENT_SECRET: string | undefined =
 
 export const isGoogleConfigured = (): boolean => GOOGLE_CLIENT_ID.length > 0;
 export const isMicrosoftConfigured = (): boolean => MICROSOFT_CLIENT_ID.length > 0;
+
+/** OAuth provider に対応する client 資格情報 (Vite env 由来) を返す。 */
+export function getOAuthClientCredentials(provider: OAuthProviderId): {
+  clientId: string;
+  clientSecret?: string;
+} {
+  return provider === "google"
+    ? { clientId: GOOGLE_CLIENT_ID, clientSecret: GOOGLE_CLIENT_SECRET }
+    : { clientId: MICROSOFT_CLIENT_ID, clientSecret: MICROSOFT_CLIENT_SECRET };
+}
 
 /**
  * Web ビルド用 API ベース URL。空文字 = 同一オリジン (Vercel 内 /api/* を呼ぶ既定)。

@@ -5,12 +5,7 @@ import {
   PROVIDER_IDS,
   type ProviderId,
 } from "../auth/providers";
-import {
-  GOOGLE_CLIENT_ID,
-  GOOGLE_CLIENT_SECRET,
-  MICROSOFT_CLIENT_ID,
-  MICROSOFT_CLIENT_SECRET,
-} from "../lib/env";
+import { getOAuthClientCredentials } from "../lib/env";
 import { errMessage } from "../lib/error";
 import {
   deleteAppleCredentials,
@@ -72,10 +67,7 @@ export function useProviderStatus() {
       setBusy(provider);
       setError((e) => ({ ...e, [provider]: undefined }));
       try {
-        const clientId = provider === "google" ? GOOGLE_CLIENT_ID : MICROSOFT_CLIENT_ID;
-        const clientSecret =
-          provider === "google" ? GOOGLE_CLIENT_SECRET : MICROSOFT_CLIENT_SECRET;
-        await connectProvider(provider, { clientId, clientSecret });
+        await connectProvider(provider, getOAuthClientCredentials(provider));
         await refresh();
       } catch (e) {
         setError((prev) => ({ ...prev, [provider]: errMessage(e) }));
