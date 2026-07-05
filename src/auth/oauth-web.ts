@@ -27,7 +27,8 @@ import { getOAuthProviderSpec, type OAuthProviderId } from "./providers";
 const VERIFIER_KEY = "msp:oauth:verifier";
 const STATE_KEY = "msp:oauth:state";
 const REDIRECT_KEY = "msp:oauth:redirect_uri";
-const PROVIDER_KEY = "msp:oauth:provider";
+/** 連携中 provider の sessionStorage キー (CallbackPage が表示名の解決に読む)。 */
+export const PROVIDER_KEY = "msp:oauth:provider";
 
 export interface WebSignInConfig {
   clientId: string;

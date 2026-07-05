@@ -5,15 +5,15 @@
  */
 
 import { useEffect, useState } from "react";
-import { handleAuthCallback } from "../auth/oauth-web";
+import { handleAuthCallback, PROVIDER_KEY } from "../auth/oauth-web";
 import { errMessage } from "../lib/error";
+import { providerShortLabel } from "../lib/provider-ui";
 
 /** sessionStorage から provider を読んで表示名を返す。 */
 function getInProgressProviderLabel(): string {
   try {
-    const p = sessionStorage.getItem("msp:oauth:provider");
-    if (p === "microsoft") return "Outlook";
-    if (p === "google") return "Google";
+    const p = sessionStorage.getItem(PROVIDER_KEY);
+    if (p === "microsoft" || p === "google") return providerShortLabel(p);
   } catch {
     /* ignore */
   }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { PROVIDER_IDS, type ProviderId } from "./auth/providers";
 import { AppleConnectModal } from "./components/AppleConnectModal";
 import { ConnectPrompt } from "./components/ConnectPrompt";
@@ -16,10 +16,12 @@ import { useMediaQuery } from "./hooks/useMediaQuery";
 import { useProviderStatus } from "./hooks/useProviderStatus";
 import { useSelection } from "./hooks/useSelection";
 import { useShortcut } from "./hooks/useShortcut";
+import { useTauriMenubar } from "./hooks/useTauriMenubar";
 import { useUpdater } from "./hooks/useUpdater";
 import { copyText } from "./lib/clipboard";
 import { isGoogleConfigured, isMicrosoftConfigured } from "./lib/env";
-import { isTauri } from "./lib/tauri";
+import { providerShortLabel } from "./lib/provider-ui";
+import { formatShortcutCompact } from "./lib/shortcut-format";
 import { CallbackPage } from "./pages/CallbackPage";
 
 /** アプリのルート。連携状態に応じて連携案内 / 設定 / 週グリッドを切り替える。 */
@@ -69,43 +71,11 @@ function MainApp() {
     await copyText(preview);
   }, [preview]);
 
-  // OAuth 連携中はフォーカス喪失で隠さない (ブラウザに移ると消えてしまうのを防ぐ)。
-  const connectingRef = useRef(false);
-  useEffect(() => {
-    connectingRef.current = providerStatus.busy !== null;
-  }, [providerStatus.busy]);
-
-  // メニューバー常駐の挙動 (Tauri のみ)
-  useEffect(() => {
-    if (!isTauri()) return;
-    let cancelled = false;
-    let unlisten: (() => void) | undefined;
-    const hide = async () => {
-      const { getCurrentWindow } = await import("@tauri-apps/api/window");
-      await getCurrentWindow().hide();
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") void hide();
-    };
-    window.addEventListener("keydown", onKey);
-    void (async () => {
-      const { getCurrentWindow } = await import("@tauri-apps/api/window");
-      const un = await getCurrentWindow().onFocusChanged(({ payload: focused }) => {
-        if (focused) {
-          setNow(new Date());
-        } else if (!connectingRef.current) {
-          void getCurrentWindow().hide();
-        }
-      });
-      if (cancelled) un();
-      else unlisten = un;
-    })();
-    return () => {
-      cancelled = true;
-      window.removeEventListener("keydown", onKey);
-      unlisten?.();
-    };
-  }, []);
+  // メニューバー常駐の挙動 (Tauri のみ)。OAuth 連携中はフォーカス喪失で隠さない。
+  useTauriMenubar({
+    connecting: providerStatus.busy !== null,
+    onFocus: () => setNow(new Date()),
+  });
 
   const configMissing = useMemo<Record<ProviderId, boolean>>(
     () => ({
@@ -122,13 +92,11 @@ function MainApp() {
   const showLoading = !loaded || !providerStatus.allKnown;
 
   // 表示用の合計 busy 数とエラー文字列 (複数 provider のうち最初のエラーを表示)
-  const providerLabel = (p: ProviderId): string =>
-    p === "microsoft" ? "Outlook" : p === "apple" ? "Apple" : "Google";
   const aggregatedBusyError = useMemo(() => {
     const e: string[] = [];
     for (const p of PROVIDER_IDS) {
       const msg = busyErrors[p];
-      if (msg) e.push(`${providerLabel(p)}: ${msg}`);
+      if (msg) e.push(`${providerShortLabel(p)}: ${msg}`);
     }
     return e.length > 0 ? e.join(" / ") : null;
   }, [busyErrors]);
@@ -153,12 +121,7 @@ function MainApp() {
           日程ピッカー Pro
         </span>
         <span data-tauri-drag-region className="text-[10px] text-gray-400">
-          {config.shortcut
-            .replace("CmdOrControl", "Ctrl")
-            .replace("Control", "Ctrl")
-            .replace("Cmd", "⌘")
-            .replace(/Key([A-Z])/g, "$1")
-            .replace(/\+/g, "+")}
+          {formatShortcutCompact(config.shortcut)}
         </span>
       </header>
       {updater.available && (
