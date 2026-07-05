@@ -36,7 +36,7 @@ cat ~/.tauri/meeting-slot-picker.key.pub   # 公開鍵 (base64)
 `plugins.updater.endpoints` のリポジトリ URL が自分の GitHub リポジトリと一致しているか確認:
 
 ```
-https://github.com/<owner>/meeting-slot-picker/releases/latest/download/latest.json
+https://github.com/<owner>/meeting-slot-picker/releases/latest/download/pro-latest.json
 ```
 
 ## リリース手順 (毎回)
@@ -54,21 +54,24 @@ npm run tauri:build -- --target universal-apple-darwin  # 実機ビルド検証 
 ### 2. バージョン bump
 
 ```bash
-npm version patch    # or minor / major  → package.json が更新される
+npm version patch --no-git-tag-version   # or minor / major  → package.json が更新される
 node scripts/sync-version.mjs   # Cargo.toml と tauri.conf.json を同期
-git add package.json src-tauri/Cargo.toml src-tauri/tauri.conf.json
-git commit --amend --no-edit
+git add package.json package-lock.json src-tauri/Cargo.toml src-tauri/tauri.conf.json
+git commit -m "chore: bump version to X.Y.Z"
 ```
 
 ### 3. tag を push
 
+CI は `pro-vX.Y.Z` 形式の tag でのみ発火する（無印の `vX.Y.Z` では動かない）:
+
 ```bash
+git tag pro-vX.Y.Z
 git push --follow-tags
 ```
 
 → GitHub Actions が自動で:
 - macOS ランナーで Universal Binary をビルド
-- `.dmg` + `.app.tar.gz` + `.sig` + `latest.json` を生成
+- `.dmg` + `.app.tar.gz` + `.sig` + `pro-latest.json` を生成
 - GitHub Release を作成しアーティファクトを添付
 
 ### 4. 既存ユーザーへの反映

@@ -53,9 +53,11 @@ jobs:
           # 失敗するため使わず、次のステップで自前生成・アップロードする。
           includeUpdaterJson: false
 
-      # tauri-action は universal ターゲットだと latest.json/.sig をアップロードしない
-      # ので、ビルド成果物の .app.tar.gz を再署名して latest.json と共にアップロード。
-      - name: Sign updater artifact & upload latest.json
+      # tauri-action は universal ターゲットだと updater json/.sig をアップロードしない
+      # ので、ビルド成果物の .app.tar.gz を再署名して pro-latest.json と共にアップロード。
+      # ファイル名は tauri.conf.json の updater endpoint (pro-latest.json) と一致させる。
+      # 旧無印アプリ (v0.1.0) のチャンネル latest.json とは別名にして共存させる。
+      - name: Sign updater artifact & upload pro-latest.json
         if: success()
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -77,7 +79,8 @@ jobs:
           URL="https://github.com/$REPO/releases/download/$TAG/$TAR_NAME"
           SIG_UPLOAD_NAME="${TAR_NAME}.sig"
           cp "$SIG_FILE" "$SIG_UPLOAD_NAME"
-          VERSION="${TAG#v}"
+          # タグは pro-vX.Y.Z 形式。updater の version は素の semver が必要。
+          VERSION="${TAG#pro-v}"
           SIG_FILE_PATH="$SIG_FILE" UPDATE_URL="$URL" UPDATE_VERSION="$VERSION" node -e "
             const fs = require('fs');
             const sig = fs.readFileSync(process.env.SIG_FILE_PATH, 'utf8');
@@ -90,6 +93,6 @@ jobs:
                 'darwin-aarch64': { signature: sig, url: process.env.UPDATE_URL }
               }
             };
-            fs.writeFileSync('latest.json', JSON.stringify(data, null, 2));
+            fs.writeFileSync('pro-latest.json', JSON.stringify(data, null, 2));
           "
-          gh release upload "$TAG" "$SIG_UPLOAD_NAME" latest.json --clobber
+          gh release upload "$TAG" "$SIG_UPLOAD_NAME" pro-latest.json --clobber
