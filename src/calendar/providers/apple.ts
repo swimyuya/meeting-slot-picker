@@ -10,6 +10,9 @@ import { httpFetch, type HttpFetch } from "../../lib/http";
 import type { AppleCredentials } from "../../lib/secrets";
 import type { CalendarEvent } from "../types";
 
+/** Apple イベント取得 API のパス (apple-connect.ts の接続テストも同じ endpoint を使う)。 */
+export const APPLE_EVENTS_PATH = "/api/calendar/apple/events";
+
 export interface AppleEventsInput {
   credentials: AppleCredentials;
   timeMin: Date;
@@ -25,7 +28,7 @@ export async function fetchAppleEvents(
   deps: AppleEventsDeps = {},
 ): Promise<CalendarEvent[]> {
   const fetchFn = deps.fetchFn ?? httpFetch;
-  const url = `${getApiBaseUrl()}/api/calendar/apple/events`;
+  const url = `${getApiBaseUrl()}${APPLE_EVENTS_PATH}`;
   const res = await fetchFn(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

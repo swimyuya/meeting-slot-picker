@@ -26,33 +26,43 @@ export interface FetchEventsDeps {
   now?: () => number;
 }
 
-export async function fetchEventsForProvider(
+type ProviderFetcher = (
   input: FetchEventsInput,
-  deps: FetchEventsDeps = {},
-): Promise<CalendarEvent[]> {
-  if (input.provider === "apple") {
+  deps: FetchEventsDeps,
+) => Promise<CalendarEvent[]>;
+
+/** provider spec レジストリ (auth/providers) と同じ Record ディスパッチ方式。 */
+const FETCHERS: Readonly<Record<ProviderId, ProviderFetcher>> = {
+  google: (input, deps) =>
+    fetchGoogleEvents(
+      {
+        auth: input.auth,
+        calendarId: input.calendarId ?? "primary",
+        timeMin: input.timeMin,
+        timeMax: input.timeMax,
+      },
+      deps,
+    ),
+  microsoft: (input, deps) =>
+    fetchMicrosoftEvents(
+      { auth: input.auth, timeMin: input.timeMin, timeMax: input.timeMax },
+      deps,
+    ),
+  apple: async (input, deps) => {
     const credentials = await getAppleCredentials();
     if (!credentials) return [];
     return fetchAppleEvents(
       { credentials, timeMin: input.timeMin, timeMax: input.timeMax },
       { fetchFn: deps.fetchFn },
     );
-  }
-  if (input.provider === "microsoft") {
-    return fetchMicrosoftEvents(
-      { auth: input.auth, timeMin: input.timeMin, timeMax: input.timeMax },
-      deps,
-    );
-  }
-  return fetchGoogleEvents(
-    {
-      auth: input.auth,
-      calendarId: input.calendarId ?? "primary",
-      timeMin: input.timeMin,
-      timeMax: input.timeMax,
-    },
-    deps,
-  );
+  },
+};
+
+export async function fetchEventsForProvider(
+  input: FetchEventsInput,
+  deps: FetchEventsDeps = {},
+): Promise<CalendarEvent[]> {
+  return FETCHERS[input.provider](input, deps);
 }
 
 export { fetchAppleEvents } from "./apple";

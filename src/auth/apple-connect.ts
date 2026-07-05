@@ -9,6 +9,7 @@
  * 4. その他 → 接続エラーとして throw
  */
 
+import { APPLE_EVENTS_PATH } from "../calendar/providers/apple";
 import { getApiBaseUrl } from "../lib/env";
 import {
   type AppleCredentials,
@@ -44,7 +45,7 @@ export async function connectApple(
   // 検証: 今日から 24 時間の範囲で取得を試みる
   const now = new Date();
   const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-  const url = `${getApiBaseUrl()}/api/calendar/apple/events`;
+  const url = `${getApiBaseUrl()}${APPLE_EVENTS_PATH}`;
 
   const res = await fetchFn(url, {
     method: "POST",
