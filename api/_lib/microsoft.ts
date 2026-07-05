@@ -6,11 +6,14 @@
  * Pro 版で Outlook 連携を提供するためのバックエンド。
  */
 
+import { postTokenRequest } from "./token-request.js";
+
 const TOKEN_ENDPOINT = "https://login.microsoftonline.com/common/oauth2/v2.0/token";
 
 // scope は authorize と token endpoint の両方に必要 (v2.0 仕様)。
-// クライアント側 oauth.ts の MICROSOFT_SPEC.defaultScope と揃える。
-const SCOPE = "openid email offline_access User.Read Calendars.Read";
+// クライアント側 src/auth/providers/microsoft.ts の MICROSOFT_SPEC.defaultScope と
+// 揃える (scope-sync.test.ts が同値をテストで強制する)。
+export const SCOPE = "openid email offline_access User.Read Calendars.Read";
 
 export interface MicrosoftConfig {
   clientId: string;
@@ -38,7 +41,6 @@ export async function exchangeMicrosoftAuthCode(args: {
   expires_in: number;
   id_token?: string;
 }> {
-  const fetchFn = args.fetchFn ?? fetch;
   const body = new URLSearchParams({
     code: args.code,
     code_verifier: args.codeVerifier,
@@ -48,17 +50,13 @@ export async function exchangeMicrosoftAuthCode(args: {
     grant_type: "authorization_code",
     scope: SCOPE,
   });
-  const res = await fetchFn(TOKEN_ENDPOINT, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+  const json = await postTokenRequest({
+    endpoint: TOKEN_ENDPOINT,
+    label: "microsoft",
+    op: "token exchange",
     body,
+    fetchFn: args.fetchFn,
   });
-  const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-  if (!res.ok) {
-    const desc = typeof json.error_description === "string" ? json.error_description : "";
-    const err = typeof json.error === "string" ? json.error : `http_${res.status}`;
-    throw new Error(`microsoft token exchange failed: ${err} ${desc}`.trim());
-  }
   if (typeof json.refresh_token !== "string" || typeof json.access_token !== "string") {
     throw new Error("microsoft token exchange: missing tokens in response");
   }
@@ -87,7 +85,6 @@ export async function refreshMicrosoftAccessToken(args: {
   expires_in: number;
   id_token?: string;
 }> {
-  const fetchFn = args.fetchFn ?? fetch;
   const body = new URLSearchParams({
     refresh_token: args.refreshToken,
     client_id: args.config.clientId,
@@ -95,17 +92,13 @@ export async function refreshMicrosoftAccessToken(args: {
     grant_type: "refresh_token",
     scope: SCOPE,
   });
-  const res = await fetchFn(TOKEN_ENDPOINT, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+  const json = await postTokenRequest({
+    endpoint: TOKEN_ENDPOINT,
+    label: "microsoft",
+    op: "refresh",
     body,
+    fetchFn: args.fetchFn,
   });
-  const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-  if (!res.ok) {
-    const desc = typeof json.error_description === "string" ? json.error_description : "";
-    const err = typeof json.error === "string" ? json.error : `http_${res.status}`;
-    throw new Error(`microsoft refresh failed: ${err} ${desc}`.trim());
-  }
   if (typeof json.access_token !== "string") {
     throw new Error("microsoft refresh: missing access_token");
   }

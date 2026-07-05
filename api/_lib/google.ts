@@ -4,6 +4,8 @@
  * client_secret は Vercel サーバ env (GOOGLE_CLIENT_SECRET) からのみ取得する。
  */
 
+import { postTokenRequest } from "./token-request.js";
+
 const TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
 
 export interface GoogleConfig {
@@ -32,7 +34,6 @@ export async function exchangeAuthCode(args: {
   expires_in: number;
   id_token?: string;
 }> {
-  const fetchFn = args.fetchFn ?? fetch;
   const body = new URLSearchParams({
     code: args.code,
     code_verifier: args.codeVerifier,
@@ -41,17 +42,13 @@ export async function exchangeAuthCode(args: {
     client_secret: args.config.clientSecret,
     grant_type: "authorization_code",
   });
-  const res = await fetchFn(TOKEN_ENDPOINT, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+  const json = await postTokenRequest({
+    endpoint: TOKEN_ENDPOINT,
+    label: "google",
+    op: "token exchange",
     body,
+    fetchFn: args.fetchFn,
   });
-  const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-  if (!res.ok) {
-    const desc = typeof json.error_description === "string" ? json.error_description : "";
-    const err = typeof json.error === "string" ? json.error : `http_${res.status}`;
-    throw new Error(`google token exchange failed: ${err} ${desc}`.trim());
-  }
   if (typeof json.refresh_token !== "string" || typeof json.access_token !== "string") {
     throw new Error("google token exchange: missing tokens in response");
   }
@@ -69,24 +66,19 @@ export async function refreshAccessToken(args: {
   refreshToken: string;
   fetchFn?: typeof fetch;
 }): Promise<{ access_token: string; expires_in: number }> {
-  const fetchFn = args.fetchFn ?? fetch;
   const body = new URLSearchParams({
     refresh_token: args.refreshToken,
     client_id: args.config.clientId,
     client_secret: args.config.clientSecret,
     grant_type: "refresh_token",
   });
-  const res = await fetchFn(TOKEN_ENDPOINT, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+  const json = await postTokenRequest({
+    endpoint: TOKEN_ENDPOINT,
+    label: "google",
+    op: "refresh",
     body,
+    fetchFn: args.fetchFn,
   });
-  const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-  if (!res.ok) {
-    const desc = typeof json.error_description === "string" ? json.error_description : "";
-    const err = typeof json.error === "string" ? json.error : `http_${res.status}`;
-    throw new Error(`google refresh failed: ${err} ${desc}`.trim());
-  }
   if (typeof json.access_token !== "string") {
     throw new Error("google refresh: missing access_token");
   }
