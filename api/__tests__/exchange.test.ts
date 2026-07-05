@@ -136,6 +136,72 @@ describe("/api/auth/exchange", () => {
     expect((res as unknown as { statusCode: number }).statusCode).toBe(400);
   });
 
+  it("provider=microsoft は MS endpoint に scope + client_secret 付きで POST し id_token も返す", async () => {
+    process.env.MICROSOFT_CLIENT_ID = "ms-id";
+    process.env.MICROSOFT_CLIENT_SECRET = "ms-secret";
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          access_token: "ms-at",
+          refresh_token: "ms-rt",
+          expires_in: 1200,
+          id_token: "ms-idt",
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    const handler = (await import("../auth/exchange")).default;
+    const req = {
+      method: "POST",
+      headers: { origin: "https://meeting-slot-picker.vercel.app" },
+      body: {
+        provider: "microsoft",
+        code: "MS_CODE",
+        code_verifier: "a".repeat(64),
+        redirect_uri: "https://meeting-slot-picker.vercel.app/auth/callback",
+      },
+    } as unknown as VercelRequest;
+    const res = mockRes();
+    await handler(req, res);
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+      expect.objectContaining({ method: "POST" }),
+    );
+    const [, init] = fetchSpy.mock.calls[0];
+    const params = init!.body as URLSearchParams;
+    expect(params.get("scope")).toBe("openid email offline_access User.Read Calendars.Read");
+    expect(params.get("client_secret")).toBe("ms-secret");
+    expect(params.get("code")).toBe("MS_CODE");
+    expect((res as unknown as { statusCode: number }).statusCode).toBe(200);
+    expect((res as unknown as { body: unknown }).body).toMatchObject({
+      access_token: "ms-at",
+      refresh_token: "ms-rt",
+      expires_in: 1200,
+      id_token: "ms-idt",
+    });
+  });
+
+  it("上流の token endpoint が失敗したら 500 exchange_failed (詳細は隠す)", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ error: "invalid_grant" }), { status: 400 }),
+    );
+    const handler = (await import("../auth/exchange")).default;
+    const req = {
+      method: "POST",
+      headers: { origin: "https://meeting-slot-picker.vercel.app" },
+      body: {
+        code: "AUTHCODE",
+        code_verifier: "a".repeat(64),
+        redirect_uri: "https://meeting-slot-picker.vercel.app/auth/callback",
+      },
+    } as unknown as VercelRequest;
+    const res = mockRes();
+    await handler(req, res);
+    expect((res as unknown as { statusCode: number }).statusCode).toBe(500);
+    expect((res as unknown as { body: unknown }).body).toEqual({ error: "exchange_failed" });
+  });
+
   it("Tauri ループバック http://127.0.0.1:PORT は redirect_uri として許可", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(
