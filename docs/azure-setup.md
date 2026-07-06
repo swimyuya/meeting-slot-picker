@@ -32,8 +32,13 @@ Microsoft アカウント (個人 outlook.com もしくは仕事用 Microsoft 36
 
 #### 4-1. Mobile and desktop applications (macOS Tauri 用)
 
-- Custom redirect URIs: `http://localhost:4322`
+- Custom redirect URIs (**両方**登録する):
+  - `http://127.0.0.1:4322` ← アプリが実際に送る値 (RFC 8252 準拠で 127.0.0.1 を使用)
+  - `http://localhost:4322` (予備)
 - 「Configure」
+
+> Azure は `localhost` と `127.0.0.1` を別 URI として厳密照合するため、
+> `127.0.0.1` 側が無いと AADSTS50011 になる。
 
 #### 4-2. Single-page application (PWA 用)
 
