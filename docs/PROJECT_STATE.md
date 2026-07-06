@@ -101,7 +101,7 @@
 
 ## 4. 既知の注意点 / gotcha
 
-- **Tauri デスクトップ版から Apple 連携が構成上到達不能**（2026-07-06 調査で発見・未修正）: tauri.conf.json の CSP `connect-src` と capabilities の http allowlist に `*.vercel.app` / `caldav.icloud.com` が無い。Apple 連携は Vercel API 経由のため、デスクトップ版では繋がらないはず。Web/PWA・Chrome 拡張では動く。desktop で有効にするなら CSP+capability 追加＋実機検証が必要（product 判断待ち）
+- **Tauri デスクトップ版の Apple 連携到達不能 → 2026-07-06 修正済み**。修正内容: (1) apple-connect.ts の素 fetch を `httpFetch` に変更（Tauri では Rust 側 plugin-http 経由になり webview の CSP/CORS の外。Web/拡張は従来どおりブラウザ fetch）(2) capabilities/default.json の http allowlist に `https://meeting-slot-picker-pro.vercel.app/*` 追加 (3) `tauri:dev` / `tauri:build` npm script と release.yml に `VITE_API_BASE_URL=https://meeting-slot-picker-pro.vercel.app` を明示（デスクトップビルドは同一オリジンが無いので絶対 URL 必須。従来は空でtauri://相対→必ず失敗だった）。CSP connect-src への追加は**不要**（desktop の API 通信は全て plugin-http）。サーバ側 CORS 変更・再デプロイも不要（plugin-http は Origin を送らず、POST は Origin 無しでも処理される）。**Pro の本番 API = meeting-slot-picker-pro.vercel.app**（無印 meeting-slot-picker.vercel.app とは別デプロイ、apple エンドポイントは Pro 側にのみ存在・生存確認済み）
 - api/calendar/apple/events は time_min < time_max / 期間上限を未検証（堅牢性の改善余地、未対応）
 - トレイ tooltip・コード内コメントの "Ctrl+Shift+U" 誤記は残存（macOS 実際は ⌘+Shift+U）
 - リファクタ後の設計メモ: プラットフォーム分岐は `lib/tauri.ts`、OAuth 共有部は `auth/oauth-core.ts`、provider→UI 表現は `lib/provider-ui.ts`、バー描画は `components/EventBars.tsx`（week/day の見た目差は VARIANTS で意図的に保持）。MS の OAuth scope は client/server 二重定義のまま `api/__tests__/scope-sync.test.ts` が同値を強制
@@ -109,8 +109,7 @@
 
 ## 5. 次にやること / open threads
 
-- feature/pro の 16 コミットを push（ユーザー指示待ち）
-- Apple×デスクトップの扱いを決める（CSP 追加して有効化 or Web/拡張専用と明記）
+- Apple×デスクトップ修正の実機確認（/Applications 差し替え後、Apple 連携モーダルでダミー資格情報→「パスワードが正しくありません」表示なら配線OK。本物のアプリ用パスワードなら実連携）
 - 将来リリース時: pro-vX.Y.Z タグで CI 発火（RELEASE.md 更新済み手順に従う）
 
 ## 6. 履歴 / 完了済み

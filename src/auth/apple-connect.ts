@@ -11,6 +11,7 @@
 
 import { APPLE_EVENTS_PATH } from "../calendar/providers/apple";
 import { getApiBaseUrl } from "../lib/env";
+import { httpFetch, type HttpFetch } from "../lib/http";
 import {
   type AppleCredentials,
   setAppleCredentials,
@@ -22,7 +23,7 @@ export interface ConnectAppleArgs {
 }
 
 export interface ConnectAppleDeps {
-  fetchFn?: typeof fetch;
+  fetchFn?: HttpFetch;
 }
 
 /**
@@ -32,7 +33,9 @@ export async function connectApple(
   args: ConnectAppleArgs,
   deps: ConnectAppleDeps = {},
 ): Promise<void> {
-  const fetchFn = deps.fetchFn ?? fetch;
+  // httpFetch: Tauri では Rust 側 plugin-http を使う (webview の CSP/CORS の外)。
+  // Web / 拡張ではブラウザ fetch にフォールバックし挙動は従来どおり。
+  const fetchFn = deps.fetchFn ?? httpFetch;
   const normalizedPassword = normalizeAppPassword(args.appPassword);
 
   if (!isValidEmail(args.email)) {

@@ -27,7 +27,8 @@
         { "url": "https://oauth2.googleapis.com/*" },
         { "url": "https://www.googleapis.com/*" },
         { "url": "https://login.microsoftonline.com/*" },
-        { "url": "https://graph.microsoft.com/*" }
+        { "url": "https://graph.microsoft.com/*" },
+        { "url": "https://meeting-slot-picker-pro.vercel.app/*" }
       ]
     }
   ]
