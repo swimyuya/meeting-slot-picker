@@ -1,8 +1,9 @@
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ["./index.html", "./extension/popup.html", "./src/**/*.{ts,tsx}"],
-  // OS の外観設定に追従 (Tauri webview / PWA / 拡張ポップアップ共通)
-  darkMode: "media",
+  // <html class="dark"> で制御。useAppearance が設定 (自動/ライト/ダーク) に応じて
+  // クラスを付け外しする (自動 = OS 追従)。
+  darkMode: "class",
   theme: {
     extend: {
       colors: {

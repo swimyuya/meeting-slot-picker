@@ -8,6 +8,12 @@ import { SubscriptionBadge } from "./SubscriptionBadge";
 
 type ProviderStatusReturn = ReturnType<typeof useProviderStatus>;
 
+const APPEARANCE_OPTIONS: ReadonlyArray<{ value: AppConfig["appearance"]; label: string }> = [
+  { value: "auto", label: "自動" },
+  { value: "light", label: "ライト" },
+  { value: "dark", label: "ダーク" },
+];
+
 interface Props {
   config: AppConfig;
   onSave: (next: AppConfig) => Promise<void>;
@@ -91,6 +97,38 @@ export function SettingsPanel({
             </div>
           </section>
         )}
+
+        <section className="space-y-2">
+          <h3 className="section-title">外観</h3>
+          <div
+            role="radiogroup"
+            aria-label="外観"
+            className="grid w-full max-w-xs grid-cols-3 gap-1 rounded-lg bg-gray-100 p-1 dark:bg-zinc-800"
+          >
+            {APPEARANCE_OPTIONS.map((opt) => {
+              const active = draft.appearance === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  onClick={() => set("appearance", opt.value)}
+                  className={`rounded-md px-2 py-1.5 text-[11px] font-medium transition-all duration-150 ${
+                    active
+                      ? "bg-white text-gray-800 shadow-sm dark:bg-zinc-600 dark:text-zinc-50"
+                      : "text-gray-500 hover:text-gray-700 dark:text-zinc-400 dark:hover:text-zinc-200"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-[10px] text-gray-400 dark:text-zinc-500">
+            「自動」は macOS / iOS のシステム外観に追従します（保存で反映）
+          </p>
+        </section>
 
         <section className="space-y-2">
           <h3 className="section-title">表示範囲</h3>

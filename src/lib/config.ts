@@ -19,6 +19,8 @@ export const AppConfigSchema = z
     template: z.string().default("{date}（{wday}）{ranges}"),
     rangeSeparator: z.string().default(" / "),
     shortcut: z.string().default("CmdOrControl+Shift+U"),
+    /** 外観: auto = OS に追従 / light / dark。 */
+    appearance: z.enum(["auto", "light", "dark"]).default("auto"),
   })
   .refine((c) => c.endHour > c.startHour, {
     message: "endHour は startHour より大きくしてください",

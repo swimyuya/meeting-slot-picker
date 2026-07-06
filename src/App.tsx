@@ -12,6 +12,7 @@ import { WeekGrid } from "./components/WeekGrid";
 import { format } from "./domain/formatter";
 import { collectSelectedSlots } from "./domain/selectors";
 import { applyEvents, buildSlotGrid, deriveEffectiveOptions } from "./domain/slots";
+import { useAppearance } from "./hooks/useAppearance";
 import { useBusyTimes } from "./hooks/useBusyTimes";
 import { useConfig } from "./hooks/useConfig";
 import { useMediaQuery } from "./hooks/useMediaQuery";
@@ -48,6 +49,8 @@ function MainApp() {
   const { selection, onCellDown, onCellEnter, clearAll } = useSelection();
   // config.shortcut に従ってグローバルショートカットを動的に登録 (変更時は再登録)。
   useShortcut(config.shortcut);
+  // 外観 (自動/ライト/ダーク) を <html> に反映。
+  useAppearance(config.appearance);
   const updater = useUpdater();
   const [showSettings, setShowSettings] = useState(false);
   const [showAppleModal, setShowAppleModal] = useState(false);
