@@ -2,7 +2,9 @@ import { useCallback, useMemo, useState } from "react";
 import { PROVIDER_IDS, type ProviderId } from "./auth/providers";
 import { AppleConnectModal } from "./components/AppleConnectModal";
 import { ConnectPrompt } from "./components/ConnectPrompt";
+import { LogoMark } from "./components/icons";
 import { MobileDayView } from "./components/MobileDayView";
+import { ProviderDots } from "./components/ProviderDots";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { Toolbar } from "./components/Toolbar";
 import { UpdateBanner } from "./components/UpdateBanner";
@@ -115,13 +117,20 @@ function MainApp() {
       <header
         data-tauri-drag-region
         title="ドラッグして移動"
-        className="flex cursor-grab items-center justify-between border-b bg-gray-50 px-3 py-2 select-none active:cursor-grabbing"
+        className="flex cursor-grab select-none items-center justify-between border-b border-gray-100 bg-white/90 px-3 py-2 backdrop-blur active:cursor-grabbing dark:border-zinc-800 dark:bg-zinc-950/90"
       >
-        <span data-tauri-drag-region className="text-xs font-semibold text-gray-700">
-          日程ピッカー Pro
+        <span data-tauri-drag-region className="flex items-center gap-2">
+          <LogoMark size={18} />
+          <span
+            data-tauri-drag-region
+            className="text-[13px] font-semibold tracking-tight text-gray-800 dark:text-zinc-100"
+          >
+            日程ピッカー Pro
+          </span>
         </span>
-        <span data-tauri-drag-region className="text-[10px] text-gray-400">
-          {formatShortcutCompact(config.shortcut)}
+        <span data-tauri-drag-region className="flex items-center gap-2.5">
+          <ProviderDots connected={providerStatus.connected} />
+          <kbd className="kbd">{formatShortcutCompact(config.shortcut)}</kbd>
         </span>
       </header>
       {updater.available && (
@@ -135,7 +144,8 @@ function MainApp() {
       )}
 
       {showLoading ? (
-        <div className="flex flex-1 items-center justify-center text-sm text-gray-400">
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 text-sm text-gray-400 dark:text-zinc-500">
+          <div className="h-5 w-5 animate-spin rounded-full border-2 border-gray-200 border-t-brand dark:border-zinc-700 dark:border-t-brand-400" />
           読み込み中…
         </div>
       ) : showConnectPrompt ? (
@@ -161,6 +171,7 @@ function MainApp() {
               columns={columns}
               events={events}
               selection={selection}
+              now={now}
               onCellDown={onCellDown}
               onCellEnter={onCellEnter}
             />
@@ -169,6 +180,7 @@ function MainApp() {
               columns={columns}
               events={events}
               selection={selection}
+              now={now}
               onCellDown={onCellDown}
               onCellEnter={onCellEnter}
             />

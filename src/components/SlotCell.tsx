@@ -28,8 +28,11 @@ const TAP_TOLERANCE_PX = 10;
  * マウスは従来どおり pointerdown で即時選択し、pointerenter でドラッグ選択も継続。
  */
 export function SlotCell({ slot, selected, onDown, onEnter }: Props) {
-  const baseClasses = "h-7 cursor-pointer border-b border-gray-100 transition-colors";
-  const bgClass = selected ? "bg-brand/80" : "bg-white hover:bg-brand/15";
+  const baseClasses =
+    "h-7 cursor-pointer border-b border-gray-100 transition-colors duration-100 dark:border-zinc-800/60";
+  const bgClass = selected
+    ? "bg-brand/90 shadow-[inset_0_0_0_1px_rgb(255_255_255/0.18)]"
+    : "bg-transparent hover:bg-brand-50 active:bg-brand-100 dark:hover:bg-brand-500/10 dark:active:bg-brand-500/20";
   const hasEvents = slot.events.length > 0;
   const ariaLabel = hasEvents
     ? slot.events.map((e) => e.summary).join(", ")

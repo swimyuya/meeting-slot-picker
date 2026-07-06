@@ -47,25 +47,22 @@ export function CallbackPage() {
 
   if (status === "working") {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
-        <div className="h-6 w-6 animate-spin rounded-full border-2 border-gray-300 border-t-gray-700" />
-        <p className="text-sm text-gray-600">{providerLabel} アカウントに連携中…</p>
+      <div className="flex h-full animate-fade-in flex-col items-center justify-center gap-3 p-6 text-center">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-gray-200 border-t-brand dark:border-zinc-700 dark:border-t-brand-400" />
+        <p className="text-sm text-gray-600 dark:text-zinc-300">{providerLabel} アカウントに連携中…</p>
       </div>
     );
   }
 
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center">
-      <p className="text-sm font-semibold text-red-600">連携に失敗しました</p>
+    <div className="flex h-full animate-fade-in-up flex-col items-center justify-center gap-4 p-6 text-center">
+      <p className="text-sm font-semibold text-red-600 dark:text-red-400">連携に失敗しました</p>
       {error && (
-        <p className="break-all text-xs text-gray-600">
+        <p className="max-w-sm break-all text-xs leading-5 text-gray-600 dark:text-zinc-400">
           {classifyError(error)}
         </p>
       )}
-      <a
-        href="/"
-        className="rounded bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700"
-      >
+      <a href="/" className="btn btn-primary px-4 py-2 text-sm">
         トップに戻ってやり直す
       </a>
     </div>

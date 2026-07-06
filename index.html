@@ -8,13 +8,14 @@
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
-    <meta name="theme-color" content="#0f172a" />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#09090b" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="日程ピッカー Pro" />
     <meta name="mobile-web-app-capable" content="yes" />
   </head>
-  <body class="bg-white text-gray-900 antialiased select-none">
+  <body class="select-none">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

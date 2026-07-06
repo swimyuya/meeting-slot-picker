@@ -25,9 +25,13 @@ export function eventSourcePrefix(source: ProviderId | undefined): string {
   return "";
 }
 
-/** イベントバーの色クラス (Google=グレー / Outlook=水色 / Apple=ピンク)。 */
+/** イベントバーの色クラス (Google=グレー / Outlook=水色 / Apple=ピンク)。左アクセント + 淡色地。 */
 export function eventBarColorClasses(source: ProviderId | undefined): string {
-  if (source === "microsoft") return "border-sky-400/40 bg-sky-200/55";
-  if (source === "apple") return "border-pink-400/40 bg-pink-200/55";
-  return "border-gray-400/40 bg-gray-300/55";
+  if (source === "microsoft") {
+    return "border-l-sky-400 bg-sky-100/85 text-sky-950 dark:border-l-sky-500 dark:bg-sky-500/15 dark:text-sky-100";
+  }
+  if (source === "apple") {
+    return "border-l-pink-400 bg-pink-100/85 text-pink-950 dark:border-l-pink-500 dark:bg-pink-500/15 dark:text-pink-100";
+  }
+  return "border-l-zinc-400 bg-zinc-200/70 text-zinc-800 dark:border-l-zinc-500 dark:bg-zinc-600/40 dark:text-zinc-100";
 }

@@ -11,32 +11,35 @@ export interface SubscriptionBadgeProps {
   daysRemaining?: number;
 }
 
+const BASE =
+  "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-medium ring-1";
+
 export function SubscriptionBadge({ status = "beta", daysRemaining }: SubscriptionBadgeProps) {
   switch (status) {
     case "trial":
       return (
-        <div className="flex items-center justify-center gap-2 rounded bg-amber-100 px-3 py-1.5 text-[11px] text-amber-800">
-          <span>⏳ Pro 無料試用中{daysRemaining != null ? `（あと ${daysRemaining} 日）` : ""}</span>
-        </div>
+        <span className={`${BASE} bg-amber-50 text-amber-800 ring-amber-200/70 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/30`}>
+          ⏳ Pro 無料試用中{daysRemaining != null ? `（あと ${daysRemaining} 日）` : ""}
+        </span>
       );
     case "active":
       return (
-        <div className="flex items-center justify-center gap-2 rounded bg-emerald-100 px-3 py-1.5 text-[11px] text-emerald-800">
-          <span>✓ Pro 加入中</span>
-        </div>
+        <span className={`${BASE} bg-emerald-50 text-emerald-800 ring-emerald-200/70 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/30`}>
+          ✓ Pro 加入中
+        </span>
       );
     case "expired":
       return (
-        <div className="flex items-center justify-center gap-2 rounded bg-red-100 px-3 py-1.5 text-[11px] text-red-800">
-          <span>⚠️ Pro 試用期間が終了しました</span>
-        </div>
+        <span className={`${BASE} bg-red-50 text-red-800 ring-red-200/70 dark:bg-red-500/10 dark:text-red-300 dark:ring-red-500/30`}>
+          ⚠️ Pro 試用期間が終了しました
+        </span>
       );
     case "beta":
     default:
       return (
-        <div className="flex items-center justify-center gap-2 rounded bg-emerald-50 px-3 py-1.5 text-[11px] text-emerald-800">
-          <span>🎁 Free Pro Beta — 全機能ご利用いただけます</span>
-        </div>
+        <span className={`${BASE} bg-gradient-to-r from-brand-50 to-violet-50 text-brand-800 ring-brand-200/70 dark:from-brand-500/10 dark:to-violet-500/10 dark:text-brand-300 dark:ring-brand-500/30`}>
+          🎁 Free Pro Beta — 全機能ご利用いただけます
+        </span>
       );
   }
 }

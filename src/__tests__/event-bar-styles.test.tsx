@@ -78,7 +78,7 @@ describe("WeekGrid のイベントバー", () => {
     expect(el.style.left).toBe("calc(0% + 1px)");
     expect(el.style.width).toBe("calc(100% - 2px)");
     expect(el.className).toContain("text-[10px]");
-    expect(el.className).toContain("border-sky-400/40 bg-sky-200/55");
+    expect(el.className).toContain("border-l-sky-400 bg-sky-100/85");
     expect(el.getAttribute("data-event-source")).toBe("microsoft");
     expect(el.getAttribute("title")).toBe("9:00-9:30 Outlook: 会議");
     expect(el.textContent).toBe("会議9:00-9:30");
@@ -89,7 +89,7 @@ describe("WeekGrid のイベントバー", () => {
     const el = bar(container, "e2");
     expect(el.style.top).toBe("28px");
     expect(el.style.height).toBe("14px");
-    expect(el.className).toContain("border-pink-400/40 bg-pink-200/55");
+    expect(el.className).toContain("border-l-pink-400 bg-pink-100/85");
     expect(el.getAttribute("title")).toBe("9:30-9:35 Apple: 短い");
     expect(el.textContent).toBe("短い");
   });
@@ -98,7 +98,7 @@ describe("WeekGrid のイベントバー", () => {
     const { container } = renderWeek([timedEvent("e3", "無印", 0, 30)]);
     const el = bar(container, "e3");
     expect(el.getAttribute("data-event-source")).toBe("google");
-    expect(el.className).toContain("border-gray-400/40 bg-gray-300/55");
+    expect(el.className).toContain("border-l-zinc-400 bg-zinc-200/70");
     expect(el.getAttribute("title")).toBe("9:00-9:30 無印");
   });
 
@@ -131,7 +131,7 @@ describe("MobileDayView のイベントバー", () => {
     expect(el.style.left).toBe("calc(0% + 2px)");
     expect(el.style.width).toBe("calc(100% - 4px)");
     expect(el.className).toContain("text-[11px]");
-    expect(el.className).toContain("border-sky-400/40 bg-sky-200/55");
+    expect(el.className).toContain("border-l-sky-400 bg-sky-100/85");
     expect(el.getAttribute("title")).toBe("9:00-9:30 Outlook: 会議");
     expect(el.textContent).toBe("会議9:00-9:30");
   });
@@ -159,6 +159,6 @@ describe("MobileDayView のイベントバー", () => {
     const { container } = renderMobile([timedEvent("m2", "短い", 30, 35, "apple")]);
     const el = bar(container, "m2");
     expect(el.style.height).toBe("14px");
-    expect(el.className).toContain("border-pink-400/40 bg-pink-200/55");
+    expect(el.className).toContain("border-l-pink-400 bg-pink-100/85");
   });
 });

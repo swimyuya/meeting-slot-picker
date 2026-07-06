@@ -4,14 +4,18 @@ import { eventsForDay, layoutTimedEvents, SLOT_HEIGHT_PX } from "../domain/dayLa
 import type { Selection } from "../domain/selection";
 import type { DayColumn } from "../domain/slots";
 import { useHorizontalSwipe } from "../hooks/useHorizontalSwipe";
-import { formatDayLabel, toHHMM } from "../lib/time";
+import { formatDayLabel, toDayISO, toHHMM } from "../lib/time";
 import { EventBars } from "./EventBars";
+import { IconChevronLeft, IconChevronRight } from "./icons";
+import { NowIndicator } from "./NowIndicator";
 import { SlotCell } from "./SlotCell";
 
 interface Props {
   columns: readonly DayColumn[];
   events: readonly CalendarEvent[];
   selection: Selection;
+  /** 現在時刻。今日を表示中なら現在時刻ラインを描く。 */
+  now?: Date;
   onCellDown: (key: string, isSelected: boolean) => void;
   onCellEnter: (key: string) => void;
 }
@@ -28,6 +32,7 @@ export function MobileDayView({
   columns,
   events,
   selection,
+  now,
   onCellDown,
   onCellEnter,
 }: Props) {
@@ -45,7 +50,7 @@ export function MobileDayView({
 
   if (columns.length === 0) {
     return (
-      <div className="p-8 text-center text-sm text-gray-400">
+      <div className="p-8 text-center text-sm text-gray-400 dark:text-zinc-500">
         表示できる日がありません。設定を確認してください。
       </div>
     );
@@ -63,21 +68,22 @@ export function MobileDayView({
   );
 
   const timeAreaHeight = rowCount * SLOT_HEIGHT_PX;
+  const isTodayView = now ? col.dayISO === toDayISO(now) : false;
 
   return (
     <div ref={swipeRef} className="flex flex-1 flex-col overflow-hidden">
       {/* 日付ヘッダ + 前後 */}
-      <div className="flex flex-none items-center justify-between border-b bg-white px-2 py-2">
+      <div className="flex flex-none items-center justify-between border-b border-gray-100 bg-white/90 px-2 py-2 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/90">
         <button
           type="button"
           aria-label="前の日"
           disabled={safeIdx <= 0}
           onClick={() => setIdx((i) => Math.max(0, i - 1))}
-          className="rounded px-3 py-1 text-lg text-gray-600 disabled:text-gray-300"
+          className="btn btn-ghost h-8 w-8 rounded-full p-0"
         >
-          ←
+          <IconChevronLeft size={16} />
         </button>
-        <span className="text-base font-semibold text-gray-800">
+        <span className="text-[15px] font-semibold tracking-tight text-gray-800 dark:text-zinc-100">
           {formatDayLabel(col.dayISO, col.weekday)}
         </span>
         <button
@@ -85,14 +91,14 @@ export function MobileDayView({
           aria-label="次の日"
           disabled={safeIdx >= columns.length - 1}
           onClick={() => setIdx((i) => Math.min(columns.length - 1, i + 1))}
-          className="rounded px-3 py-1 text-lg text-gray-600 disabled:text-gray-300"
+          className="btn btn-ghost h-8 w-8 rounded-full p-0"
         >
-          →
+          <IconChevronRight size={16} />
         </button>
       </div>
 
       {/* 日付チップ */}
-      <div className="flex flex-none gap-1 overflow-x-auto border-b bg-gray-50 px-2 py-1.5">
+      <div className="flex flex-none gap-1.5 overflow-x-auto border-b border-gray-100 bg-gray-50/80 px-2 py-2 dark:border-zinc-800 dark:bg-zinc-900/80">
         {columns.map((c, i) => {
           const label = shortDayLabel(c, i);
           const active = i === safeIdx;
@@ -101,10 +107,10 @@ export function MobileDayView({
               key={c.dayISO}
               type="button"
               onClick={() => setIdx(i)}
-              className={`flex-none rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+              className={`flex-none rounded-full px-3 py-1 text-xs font-medium transition-all duration-150 ${
                 active
-                  ? "bg-gray-900 text-white"
-                  : "bg-white text-gray-600 ring-1 ring-gray-200 hover:bg-gray-100"
+                  ? "bg-brand text-white shadow-sm"
+                  : "bg-white text-gray-600 ring-1 ring-gray-200 hover:bg-gray-100 dark:bg-zinc-800 dark:text-zinc-300 dark:ring-zinc-700 dark:hover:bg-zinc-700"
               }`}
             >
               {label}
@@ -115,13 +121,15 @@ export function MobileDayView({
 
       {/* 終日ストリップ */}
       {allDay.length > 0 && (
-        <div className="flex flex-none gap-1 overflow-x-auto border-b bg-white px-2 py-1.5">
-          <span className="flex-none self-center text-[10px] font-medium text-gray-400">終日</span>
+        <div className="flex flex-none gap-1 overflow-x-auto border-b border-gray-100 bg-white px-2 py-1.5 dark:border-zinc-800 dark:bg-zinc-950">
+          <span className="flex-none self-center text-[10px] font-medium text-gray-400 dark:text-zinc-500">
+            終日
+          </span>
           {allDay.map((ev) => (
             <span
               key={ev.id}
               title={ev.summary}
-              className="flex-none rounded bg-gray-300/70 px-2 py-1 text-xs text-gray-800"
+              className="flex-none rounded-md bg-gray-200/80 px-2 py-1 text-xs text-gray-700 dark:bg-zinc-700/70 dark:text-zinc-200"
             >
               {ev.summary}
             </span>
@@ -132,17 +140,20 @@ export function MobileDayView({
       {/* 時間軸 */}
       <div className="flex-1 overflow-auto">
         <div className="flex min-h-full">
-          <div className="flex w-12 flex-none flex-col bg-white">
+          <div className="flex w-12 flex-none flex-col bg-white dark:bg-zinc-950">
             {Array.from({ length: rowCount }).map((_, i) => (
               <div
                 key={i}
-                className="h-7 border-b border-gray-100 pr-1 text-right text-[10px] leading-7 text-gray-400"
+                className="h-7 border-b border-gray-100 pr-1.5 text-right text-[10px] leading-7 tabular-nums text-gray-400 dark:border-zinc-800/80 dark:text-zinc-500"
               >
                 {toHHMM(col.slots[i].start)}
               </div>
             ))}
           </div>
-          <div className="relative flex-1 border-l border-gray-100" style={{ height: timeAreaHeight }}>
+          <div
+            className="relative flex-1 border-l border-gray-100 dark:border-zinc-800/80"
+            style={{ height: timeAreaHeight }}
+          >
             {col.slots.map((slot) => (
               <SlotCell
                 key={slot.key}
@@ -158,6 +169,9 @@ export function MobileDayView({
               timeAreaHeight={timeAreaHeight}
               variant="day"
             />
+            {isTodayView && now && (
+              <NowIndicator now={now} gridStartMs={gridStartMs} timeAreaHeight={timeAreaHeight} />
+            )}
           </div>
         </div>
       </div>

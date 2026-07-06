@@ -14,6 +14,7 @@ import {
 } from "../auth/apple-connect";
 import { APPLE_SPEC } from "../auth/providers";
 import { errMessage } from "../lib/error";
+import { AppleGlyph } from "./icons";
 
 interface Props {
   /** モーダルを閉じる (キャンセル or 成功時) */
@@ -45,15 +46,20 @@ export function AppleConnectModal({ onClose, onSuccess }: Props) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3">
-      <div className="w-full max-w-md rounded-lg bg-white shadow-xl">
-        <form onSubmit={handleSubmit} className="space-y-3 p-4 text-sm">
-          <h2 className="text-base font-semibold text-gray-800">
-            {APPLE_SPEC.displayName} と連携
-          </h2>
+    <div className="fixed inset-0 z-50 flex animate-fade-in items-center justify-center bg-black/40 p-3 backdrop-blur-sm">
+      <div className="card w-full max-w-md animate-scale-in overflow-hidden shadow-pop">
+        <form onSubmit={handleSubmit} className="space-y-3.5 p-5 text-sm">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-50 ring-1 ring-gray-200/70 dark:bg-zinc-800 dark:ring-zinc-700">
+              <AppleGlyph size={17} className="text-gray-900 dark:text-zinc-100" />
+            </span>
+            <h2 className="text-base font-bold tracking-tight text-gray-900 dark:text-zinc-50">
+              {APPLE_SPEC.displayName} と連携
+            </h2>
+          </div>
 
-          <details className="rounded border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
-            <summary className="cursor-pointer font-medium">
+          <details className="rounded-lg border border-gray-200/80 bg-gray-50 p-2.5 text-xs text-gray-600 dark:border-zinc-700 dark:bg-zinc-800/60 dark:text-zinc-300">
+            <summary className="cursor-pointer font-medium text-gray-700 dark:text-zinc-200">
               アプリ用パスワードの取得方法
             </summary>
             <ol className="ml-4 list-decimal space-y-1 pt-2">
@@ -62,7 +68,7 @@ export function AppleConnectModal({ onClose, onSuccess }: Props) {
                   href={APPLE_SPEC.appPasswordHelpUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-blue-700 underline"
+                  className="text-brand underline hover:text-brand-700 dark:text-brand-400"
                 >
                   appleid.apple.com
                 </a>
@@ -76,7 +82,9 @@ export function AppleConnectModal({ onClose, onSuccess }: Props) {
           </details>
 
           <label className="block">
-            <span className="text-gray-700">Apple ID メールアドレス</span>
+            <span className="text-[11px] font-medium text-gray-500 dark:text-zinc-400">
+              Apple ID メールアドレス
+            </span>
             <input
               type="email"
               required
@@ -84,12 +92,14 @@ export function AppleConnectModal({ onClose, onSuccess }: Props) {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@icloud.com"
-              className="mt-1 w-full rounded border border-gray-300 px-2 py-1.5"
+              className="input mt-1 py-2 text-sm"
             />
           </label>
 
           <label className="block">
-            <span className="text-gray-700">アプリ用パスワード</span>
+            <span className="text-[11px] font-medium text-gray-500 dark:text-zinc-400">
+              アプリ用パスワード
+            </span>
             <div className="mt-1 flex items-stretch gap-2">
               <input
                 type={showPassword ? "text" : "password"}
@@ -98,40 +108,36 @@ export function AppleConnectModal({ onClose, onSuccess }: Props) {
                 value={password}
                 onChange={(e) => setPassword(normalizeAppPassword(e.target.value))}
                 placeholder="xxxxxxxxxxxxxxxx"
-                className="w-full rounded border border-gray-300 px-2 py-1.5 font-mono"
+                className="input py-2 font-mono text-sm"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword((v) => !v)}
-                className="rounded border border-gray-300 px-2 text-xs"
+                className="btn btn-secondary px-2.5 text-xs"
               >
                 {showPassword ? "隠す" : "表示"}
               </button>
             </div>
-            <p className="mt-1 text-[11px] text-gray-500">
+            <p className="mt-1 text-[11px] text-gray-400 dark:text-zinc-500">
               ペースト時のハイフン (-) は自動で除去されます
             </p>
           </label>
 
-          {error && (
-            <p className="rounded border border-red-200 bg-red-50 p-2 text-xs text-red-700">
-              {error}
-            </p>
-          )}
+          {error && <p className="alert-error">{error}</p>}
 
           <div className="flex justify-end gap-2 pt-1">
             <button
               type="button"
               onClick={onClose}
               disabled={busy}
-              className="rounded border border-gray-300 px-3 py-1.5 text-gray-700 disabled:opacity-50"
+              className="btn btn-ghost px-3 py-2"
             >
               キャンセル
             </button>
             <button
               type="submit"
               disabled={busy || !email || password.length < 8}
-              className="rounded bg-pink-600 px-4 py-1.5 font-medium text-white hover:bg-pink-700 disabled:opacity-50"
+              className="btn px-4 py-2 text-sm font-medium bg-gray-900 text-white shadow-sm hover:bg-gray-800 active:scale-[0.98] dark:bg-white dark:text-gray-900 dark:hover:bg-zinc-200"
             >
               {busy ? "連携中…" : "連携する"}
             </button>

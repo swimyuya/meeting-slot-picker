@@ -57,7 +57,7 @@ export function EventBars({ layouts, gridStartMs, timeAreaHeight, variant }: Pro
             data-event-id={layout.event.id}
             data-event-source={layout.event.source ?? DEFAULT_EVENT_SOURCE}
             title={titleText}
-            className={`pointer-events-none absolute z-10 overflow-hidden rounded border px-1 ${v.barTextClass} leading-tight text-gray-900 ${eventBarColorClasses(layout.event.source)}`}
+            className={`pointer-events-none absolute z-10 overflow-hidden rounded-md border-l-2 px-1.5 ${v.barTextClass} leading-tight ${eventBarColorClasses(layout.event.source)}`}
             style={{
               top: topPx,
               height: heightPx,
@@ -67,7 +67,7 @@ export function EventBars({ layouts, gridStartMs, timeAreaHeight, variant }: Pro
           >
             <div className="truncate font-medium">{layout.event.summary}</div>
             {heightPx >= v.labelMinHeightPx && (
-              <div className={`truncate ${v.timeTextClass} text-gray-700`}>
+              <div className={`truncate ${v.timeTextClass} tabular-nums opacity-70`}>
                 {startStr}-{endStr}
               </div>
             )}

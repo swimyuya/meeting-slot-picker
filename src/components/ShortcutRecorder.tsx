@@ -40,8 +40,10 @@ export function ShortcutRecorder({
     <div className="flex items-center gap-2">
       <code
         aria-label="現在のショートカット"
-        className={`flex-1 rounded border px-2 py-1 ${
-          recording ? "border-brand bg-brand/5 text-brand" : "border-gray-300 bg-white text-gray-700"
+        className={`flex-1 rounded-lg border px-2.5 py-1.5 font-mono text-[11px] transition-colors ${
+          recording
+            ? "border-brand bg-brand-50 text-brand-700 dark:border-brand-500 dark:bg-brand-500/10 dark:text-brand-300"
+            : "border-gray-200 bg-gray-50 text-gray-700 dark:border-zinc-700 dark:bg-zinc-800/80 dark:text-zinc-200"
         }`}
       >
         {recording ? "（キー組合せを押してください・Esc で取消）" : formatShortcutForDisplay(value)}
@@ -49,7 +51,7 @@ export function ShortcutRecorder({
       <button
         type="button"
         onClick={() => setRecording((r) => !r)}
-        className="rounded border border-gray-300 px-2 py-1"
+        className="btn btn-secondary px-2.5 py-1.5"
       >
         {recording ? "取消" : "変更"}
       </button>
