@@ -52,7 +52,10 @@
   - **fix(updater)**: CI が `latest.json` を上げていたが app は `pro-latest.json` をポーリング→CI 側を修正。`VERSION="${TAG#pro-v}"` も修正（旧 `#v` では pro-v タグから剥がれず非 semver になっていた）。RELEASE.md のタグ手順も pro-vX.Y.Z 明記
   - zip はビルド成果物として **untrack 済み**（.gitignore パターンを pro- 対応に修正、package-extension.mjs の出力名も pro- 付きに統一）→「意図的に未コミット」運用は解消
   - e2e の stale アサーション修正（旧 Google 専用版の「Google カレンダーと連携」→ Pro 版 UI 文言。Pro 化以降ずっと落ちていた）
-- 未 push: 16 コミット（invalid_grant 2 件 + リファクタ 14 件）。**push はユーザー指示待ち**
+- 2026-07-06 続き: **未テストだった残り4フックにもテスト追加**（useShortcut/useUpdater/useMediaQuery/useHorizontalSwipe、+23本）。vitest **264 緑**・coverage 91.8/84.4/82.5/91.8（functions 80.5%→82.5%で余裕確保）・cargo test 6 緑・CallbackPage もテスト済み（+7本）
+  - useShortcut.ts は動的 import をモジュールスコープの promise にメモ化（vitest で同一 callsite の2回目 import がモックを外す quirk 回避。実行時挙動は不変）
+  - **6/16 のリポジトリ移動由来の stale Rust ビルドキャッシュ（旧 ~/meeting-slot-picker 絶対パス参照, 9.5GiB）を cargo clean で除去**。放置すると次の cargo build / tauri:dev が確実に失敗する状態だった
+- **2026-07-06 push 済み**: リファクタ・テストの 17 コミットを origin/feature/pro へ push（invalid_grant の 2 件は以前に push 済みだった）。ローカルとリモートは同期状態
 
 ## 2. これまでの大きな流れ（直近コミット）
 
